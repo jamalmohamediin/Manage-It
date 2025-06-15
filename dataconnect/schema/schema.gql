@@ -49,4 +49,13 @@
 #   rating: Int
 #   reviewText: String
 #   reviewDate: Date! @default(expr: "request.time")
-# }
+}
+
+# # Appointments table
+type Appointment @table {
+  patientId: String!
+  doctorId: String!
+  receptionistId: String!
+  appointmentDate: Timestamp!
+  status: String! @default(expr: "'pending'")
+}

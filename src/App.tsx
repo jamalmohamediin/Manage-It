@@ -9,7 +9,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-100 p-6 space-y-10">
-      <h1 className="text-3xl font-bold text-center text-blue-700">Manage It</h1>
+      <h1 className="text-3xl font-bold text-center text-[#8B4513]">Manage It</h1>
 
       {/* View Toggle */}
       <div className="flex justify-center mb-4 space-x-4">

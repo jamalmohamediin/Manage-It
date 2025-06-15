@@ -43,19 +43,19 @@ const FileUploader = ({ patientId }: { patientId: string }) => {
   };
 
   return (
-    <div className="border p-4 rounded max-w-md mx-auto mt-4">
-      <h3 className="font-bold mb-2">Upload Patient Image/Document</h3>
+    <div className="bg-white p-6 rounded-lg shadow-lg max-w-md mx-auto">
+      <h3 className="text-xl font-bold mb-4 text-center text-gray-800">Upload Patient Image/Document</h3>
 
       <input
         type="file"
         onChange={(e) => setFile(e.target.files?.[0] || null)}
-        className="mb-2"
+        className="w-full bg-gray-100 border-gray-300 border p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
       />
 
       <button
         onClick={handleUpload}
         disabled={uploading}
-        className="bg-green-600 text-white px-4 py-2 rounded"
+        className="w-full bg-green-600 text-white p-3 rounded-full font-semibold hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50"
       >
         {uploading ? `Uploading... ${Math.round(progress)}%` : "Upload"}
       </button>
