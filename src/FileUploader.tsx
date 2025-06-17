@@ -1,6 +1,6 @@
 // src/FileUploader.tsx
 import { useState } from "react";
-import { storage } from "./firebase-config";
+import { storage } from "./firebase/firebase-config";
 import { ref, uploadBytesResumable } from "firebase/storage";
 
 const FileUploader = ({ patientId }: { patientId: string }) => {

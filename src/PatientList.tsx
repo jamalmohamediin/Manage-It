@@ -1,6 +1,6 @@
 // src/PatientList.tsx
 import { useEffect, useState } from "react";
-import { db } from "./firebase-config";
+import { db } from "./firebase/firebase-config";
 import { collection, onSnapshot } from "firebase/firestore";
 
 type Patient = {

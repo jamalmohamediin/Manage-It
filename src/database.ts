@@ -1,6 +1,6 @@
 // src/database.ts
 import { getFirestore, enableIndexedDbPersistence } from "firebase/firestore";
-import { app } from "./firebase-config";
+import { app } from "./firebase/firebase-config";
 
 const db = getFirestore(app);
 
