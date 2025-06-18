@@ -1,64 +1,63 @@
 // src/components/RoleList.tsx
 import React, { useEffect, useState } from 'react';
-import { collection, getDocs, query, where } from 'firebase/firestore';
-import { db } from '../firebase/firebase-config';
+import { fetchAllRoles, removeRoleAssignment } from '../firebase/roles';
+import FileUploader from './FileUploader';
 
 type UserRole = {
-  id: string;
   userId: string;
-  businessId: string;
   role: string;
-  createdAt: any;
+  businessId?: string;
 };
 
-const RoleList = () => {
+const RoleList: React.FC = () => {
   const [roles, setRoles] = useState<UserRole[]>([]);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchRoles = async () => {
-      try {
-        const q = query(collection(db, 'roles'), where('businessId', '==', 'clinic001'));
-        const snapshot = await getDocs(q);
-        const list = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...(doc.data() as Omit<UserRole, 'id'>),
-        }));
-        setRoles(list);
-      } catch (err) {
-        console.error('Error loading roles:', err);
-      } finally {
-        setLoading(false);
-      }
+    const load = async () => {
+      const data = await fetchAllRoles();
+      setRoles(data);
     };
-    fetchRoles();
+    load();
   }, []);
 
+  const handleDelete = async (role: UserRole) => {
+    try {
+      await removeRoleAssignment(role.userId, role.role);
+      setRoles((prev) =>
+        prev.filter((r) => r.userId !== role.userId || r.role !== role.role)
+      );
+    } catch (err) {
+      console.error('Delete failed', err);
+    }
+  };
+
   return (
-    <div className="mt-8">
-      <h2 className="text-xl font-bold text-[#3b2615] mb-4">User Roles</h2>
-      {loading ? (
-        <p>Loading...</p>
-      ) : roles.length === 0 ? (
-        <p>No roles assigned yet.</p>
-      ) : (
-        <ul className="space-y-2">
-          {roles.map((role) => (
-            <li key={role.id} className="p-4 border rounded shadow bg-white/80">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium text-[#3b2615]">User ID: {role.userId}</p>
-                  <p className="text-sm">Role: <strong>{role.role}</strong></p>
-                  <p className="text-xs text-gray-500">Assigned: {new Date(role.createdAt?.toDate?.()).toLocaleString()}</p>
-                </div>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
+    <div className="space-y-4">
+      <h3 className="text-lg font-bold text-[#3b2615] mb-4">Assigned Roles</h3>
+      {roles.map((role) => (
+        <div
+          key={`${role.userId}-${role.role}`}
+          className="flex flex-col gap-2 p-4 bg-white border rounded shadow"
+        >
+          <p>
+            <strong>{role.role}</strong> - {role.userId}
+          </p>
+          <FileUploader
+            userId={role.userId}
+            role={role.role}
+            businessId={role.businessId ?? ''}
+            context="role"
+          />
+          <button
+            onClick={() => handleDelete(role)}
+            className="self-start mt-2 text-red-600 hover:underline"
+          >
+            Remove
+          </button>
+        </div>
+      ))}
     </div>
   );
 };
 
 export default RoleList;
-

@@ -1,7 +1,7 @@
 // src/firebase-config.ts
-import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
-import { getStorage } from "firebase/storage";
+import { initializeApp } from 'firebase/app';
+import { initializeFirestore, persistentLocalCache } from 'firebase/firestore';
+import { getStorage } from 'firebase/storage';
 
 const firebaseConfig = {
   apiKey: "AIzaSyBh5MThllTDwnuQ3H6s-FBFN9eUC-GCKrM",
@@ -13,6 +13,13 @@ const firebaseConfig = {
   measurementId: "G-K97735R82K"
 };
 
+// ✅ Initialize Firebase app
 export const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app);
+
+// ✅ Firestore with new offline persistence system
+export const db = initializeFirestore(app, {
+  localCache: persistentLocalCache(),
+});
+
+// ✅ Firebase Storage
 export const storage = getStorage(app);

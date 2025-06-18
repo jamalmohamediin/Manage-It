@@ -1,96 +1,90 @@
 // src/components/TaskList.tsx
 import React, { useEffect, useState } from 'react';
-import { getAllTasks, updateTaskStatus } from '../firebase/tasks';
-import { Task } from '../firebase/tasks';
+import { Task, getTasks, deleteTask } from '../firebase/tasks';
+import localforage from 'localforage';
 import { toast } from 'react-hot-toast';
+import FileUploader from './FileUploader';
 
-const TaskList = () => {
+const TASKS_CACHE_KEY = 'cachedTasks';
+
+const TaskList: React.FC = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [online, setOnline] = useState(navigator.onLine);
   const [loading, setLoading] = useState(true);
+  const businessId = 'demo-business'; // Replace with dynamic one later
+  const role = 'Doctor'; // Assume this role for now or pass as prop
 
   useEffect(() => {
-    const fetchTasks = async () => {
-      try {
-        const data = await getAllTasks(); // ✅ FIXED
-        setTasks(data);
-      } catch (error) {
-        console.error('Error fetching tasks:', error);
-        toast.error('Failed to load tasks');
-      } finally {
+    const updateStatus = () => setOnline(navigator.onLine);
+    window.addEventListener('online', updateStatus);
+    window.addEventListener('offline', updateStatus);
+    return () => {
+      window.removeEventListener('online', updateStatus);
+      window.removeEventListener('offline', updateStatus);
+    };
+  }, []);
+
+  useEffect(() => {
+    const loadTasks = async () => {
+      if (online) {
+        try {
+          const fetched = await getTasks();
+          setTasks(fetched);
+          await localforage.setItem(TASKS_CACHE_KEY, fetched);
+        } catch (err) {
+          toast.error('Failed to fetch tasks online. Using cached data.');
+          const cached = await localforage.getItem<Task[]>(TASKS_CACHE_KEY);
+          if (cached) setTasks(cached);
+        } finally {
+          setLoading(false);
+        }
+      } else {
+        const cached = await localforage.getItem<Task[]>(TASKS_CACHE_KEY);
+        if (cached) setTasks(cached);
         setLoading(false);
       }
     };
-    fetchTasks();
-  }, []);
 
-  const handleStatusChange = async (taskId: string, newStatus: Task['status']) => {
+    loadTasks();
+  }, [online]);
+
+  const handleRemove = async (id: string | undefined) => {
+    if (!id) return;
     try {
-      await updateTaskStatus(taskId, newStatus);
-      toast.success('Status updated!');
-      setTasks((prev) =>
-        prev.map((task) =>
-          task.id === taskId ? { ...task, status: newStatus } : task
-        )
-      );
-    } catch (error) {
-      console.error('Error updating task status:', error);
-      toast.error('Failed to update status');
+      await deleteTask(id);
+      const updated = tasks.filter((t) => t.id !== id);
+      setTasks(updated);
+      await localforage.setItem(TASKS_CACHE_KEY, updated);
+      toast.success('Task removed');
+    } catch {
+      toast.error('Failed to delete task');
     }
   };
 
-  if (loading) {
-    return (
-      <div className="mt-8">
-        <h2 className="text-xl font-bold text-[#3b2615] mb-4">All Tasks</h2>
-        <p>Loading tasks...</p>
-      </div>
-    );
-  }
+  if (loading) return <p>Loading tasks...</p>;
 
   return (
-    <div className="mt-8">
-      <h2 className="text-xl font-bold text-[#3b2615] mb-4">All Tasks</h2>
+    <div>
+      <h2 className="text-xl font-bold text-[#3b2615] mb-4">
+        Task List {online ? '(Online)' : '(Offline)'}
+      </h2>
       {tasks.length === 0 ? (
-        <p className="text-gray-600">No tasks found.</p>
+        <p className="text-gray-500">No tasks available.</p>
       ) : (
         <ul className="space-y-4">
           {tasks.map((task) => (
-            <li key={task.id} className="p-4 border rounded shadow bg-white/70">
-              <h3 className="font-bold text-[#3b2615]">{task.taskTitle}</h3>
-              <p className="mb-2 text-sm text-gray-700">{task.description}</p>
-              <div className="grid grid-cols-2 gap-2 mb-2 text-sm">
-                <p>Assigned to: <span className="font-medium">{task.assignedTo}</span></p>
-                <p>Shop ID: <span className="font-medium">{task.shopId}</span></p>
-              </div>
-              <p className="mb-3 text-sm">
-                Due: <span className="font-medium">{new Date(task.dueDate).toLocaleString()}</span>
-              </p>
-              {task.notes && (
-                <p className="mb-3 text-sm text-gray-600">Notes: {task.notes}</p>
-              )}
-              <div className="flex items-center gap-2">
-                <label className="text-sm font-medium">Status:</label>
-                <select
-                  value={task.status}
-                  onChange={(e) =>
-                    handleStatusChange(task.id!, e.target.value as Task['status'])
-                  }
-                  className="px-3 py-1 text-sm bg-white border rounded"
-                >
-                  <option value="Pending">Pending</option>
-                  <option value="Done">Done</option>
-                  <option value="Cancelled">Cancelled</option>
-                  <option value="Delayed">Delayed</option>
-                </select>
-              </div>
-              <div className="mt-3 text-xs text-gray-500">
-                Created: {task.createdAt?.toDate().toLocaleString()}
-                {task.updatedAt && (
-                  <span className="ml-4">
-                    Updated: {task.updatedAt.toDate().toLocaleString()}
-                  </span>
-                )}
-              </div>
+            <li key={task.id} className="p-4 bg-white border rounded shadow">
+              <p><strong>{task.title}</strong></p>
+              <p>{task.description}</p>
+              <FileUploader
+                userId={task.id ?? ''}
+                role={role}
+                businessId={businessId}
+                context="task"
+              />
+              <button onClick={() => handleRemove(task.id)} className="mt-2 text-red-600 hover:underline">
+                Delete
+              </button>
             </li>
           ))}
         </ul>

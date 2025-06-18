@@ -5,6 +5,9 @@ import './index.css';
 import App from './App';
 import { Toaster } from 'react-hot-toast';
 
+// Optional: Import Firebase config to ensure Firestore offline mode starts up
+import '../src/firebase/firebase-config';
+
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <>
