@@ -3,8 +3,9 @@ import React, { useEffect, useState } from 'react';
 import localforage from 'localforage';
 import { addDoc, collection, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase/firebase-config';
-import { uploadFileForPatient } from '../firebase/storage';
 import { toast } from 'react-hot-toast';
+import { uploadFileForPatient } from '../firebase/storage';
+import { useBusinessId } from '../hooks/useBusinessId';
 
 interface EmergencyContact {
   name: string;
@@ -44,6 +45,7 @@ const initialState: PatientFormType = {
 };
 
 const PatientForm: React.FC = () => {
+  const businessId = useBusinessId();
   const [form, setForm] = useState<PatientFormType>(initialState);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -84,12 +86,13 @@ const PatientForm: React.FC = () => {
       const { file, ...patientData } = form;
       const docRef = await addDoc(collection(db, 'patients'), {
         ...patientData,
+        businessId,
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now(),
       });
 
       if (file) {
-        await uploadFileForPatient(file, docRef.id, 'Receptionist');
+        await uploadFileForPatient(file, docRef.id, businessId, 'Receptionist');
         toast.success('File uploaded');
       }
 

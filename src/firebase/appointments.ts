@@ -1,32 +1,17 @@
 // src/firebase/appointments.ts
-import { collection, addDoc, getDocs, Timestamp } from 'firebase/firestore';
 import { db } from './firebase-config';
+import { collection, addDoc, getDocs, query, where, Timestamp } from 'firebase/firestore';
 
-export type Appointment = {
-  id?: string;
-  patientId: string;
-  businessId: string;
-  reason: string;
-  date: string;
-  time: string;
-  createdAt?: Timestamp;
-  updatedAt?: Timestamp;
-};
-
-const collectionRef = collection(db, 'appointments');
-
-export const addAppointment = async (appointment: Omit<Appointment, 'id' | 'createdAt' | 'updatedAt'>) => {
-  return await addDoc(collectionRef, {
-    ...appointment,
+export async function addAppointment(data: any, businessId: string) {
+  return await addDoc(collection(db, 'appointments'), {
+    ...data,
+    businessId,
     createdAt: Timestamp.now(),
-    updatedAt: Timestamp.now(),
   });
-};
+}
 
-export const getAppointments = async (): Promise<Appointment[]> => {
-  const snapshot = await getDocs(collectionRef);
-  return snapshot.docs.map(doc => ({
-    id: doc.id,
-    ...(doc.data() as Omit<Appointment, 'id'>),
-  }));
-};
+export async function getAppointments(businessId: string) {
+  const q = query(collection(db, 'appointments'), where('businessId', '==', businessId));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+}

@@ -1,28 +1,24 @@
-// src/components/RoleList.tsx
 import React, { useEffect, useState } from 'react';
 import { fetchAllRoles, removeRoleAssignment } from '../firebase/roles';
 import FileUploader from './FileUploader';
-
-type UserRole = {
-  userId: string;
-  role: string;
-  businessId?: string;
-};
+import { UserRole } from '../types';
+import { useBusinessId } from '../hooks/useBusinessId';
 
 const RoleList: React.FC = () => {
   const [roles, setRoles] = useState<UserRole[]>([]);
+  const businessId = useBusinessId();
 
   useEffect(() => {
     const load = async () => {
-      const data = await fetchAllRoles();
+      const data = await fetchAllRoles(businessId);
       setRoles(data);
     };
     load();
-  }, []);
+  }, [businessId]);
 
   const handleDelete = async (role: UserRole) => {
     try {
-      await removeRoleAssignment(role.userId, role.role);
+      await removeRoleAssignment(role.userId, role.role, businessId);
       setRoles((prev) =>
         prev.filter((r) => r.userId !== role.userId || r.role !== role.role)
       );
@@ -45,7 +41,7 @@ const RoleList: React.FC = () => {
           <FileUploader
             userId={role.userId}
             role={role.role}
-            businessId={role.businessId ?? ''}
+            businessId={role.businessId}
             context="role"
           />
           <button

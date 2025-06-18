@@ -1,34 +1,25 @@
+// src/firebase/tasks.ts
 import { db } from './firebase-config';
-import {
-  collection,
-  addDoc,
-  getDocs,
-  deleteDoc,
-  doc,
-  Timestamp,
-} from 'firebase/firestore';
+import { collection, getDocs, deleteDoc, doc, addDoc, Timestamp } from 'firebase/firestore';
+import { Task } from '../types';
 
-export type Task = {
-  id?: string;
-  title: string;
-  description: string;
-  createdAt?: Timestamp;
-};
+export async function getTasks(businessId: string): Promise<Task[]> {
+  const snapshot = await getDocs(collection(db, 'tasks'));
+  return snapshot.docs
+    .map((doc) => ({ id: doc.id, ...doc.data() } as Task))
+    .filter((task) => task.businessId === businessId);
+}
 
-const taskRef = collection(db, 'tasks');
+export async function deleteTask(taskId: string): Promise<void> {
+  await deleteDoc(doc(db, 'tasks', taskId));
+}
 
-export const addTask = async (task: Omit<Task, 'id'>) => {
-  await addDoc(taskRef, {
-    ...task,
+// Add the missing addTask function
+export async function addTask(taskData: { title: string }, businessId: string): Promise<void> {
+  await addDoc(collection(db, 'tasks'), {
+    ...taskData,
+    businessId,
     createdAt: Timestamp.now(),
+    updatedAt: Timestamp.now(),
   });
-};
-
-export const getTasks = async (): Promise<Task[]> => {
-  const snap = await getDocs(taskRef);
-  return snap.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Task));
-};
-
-export const deleteTask = async (id: string) => {
-  await deleteDoc(doc(db, 'tasks', id));
-};
+}

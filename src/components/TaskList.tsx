@@ -1,9 +1,11 @@
 // src/components/TaskList.tsx
 import React, { useEffect, useState } from 'react';
-import { Task, getTasks, deleteTask } from '../firebase/tasks';
 import localforage from 'localforage';
-import { toast } from 'react-hot-toast';
+import { getTasks, deleteTask } from '../firebase/tasks';
+import { Task } from '../types';
 import FileUploader from './FileUploader';
+import { useBusinessId } from '../hooks/useBusinessId';
+import { toast } from 'react-hot-toast';
 
 const TASKS_CACHE_KEY = 'cachedTasks';
 
@@ -11,8 +13,8 @@ const TaskList: React.FC = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [online, setOnline] = useState(navigator.onLine);
   const [loading, setLoading] = useState(true);
-  const businessId = 'demo-business'; // Replace with dynamic one later
-  const role = 'Doctor'; // Assume this role for now or pass as prop
+  const businessId = useBusinessId();
+  const role = 'Doctor';
 
   useEffect(() => {
     const updateStatus = () => setOnline(navigator.onLine);
@@ -28,7 +30,7 @@ const TaskList: React.FC = () => {
     const loadTasks = async () => {
       if (online) {
         try {
-          const fetched = await getTasks();
+          const fetched = await getTasks(businessId);
           setTasks(fetched);
           await localforage.setItem(TASKS_CACHE_KEY, fetched);
         } catch (err) {
@@ -46,12 +48,13 @@ const TaskList: React.FC = () => {
     };
 
     loadTasks();
-  }, [online]);
+  }, [online, businessId]);
 
+  // Fixed: Remove the second parameter (businessId) from deleteTask call
   const handleRemove = async (id: string | undefined) => {
     if (!id) return;
     try {
-      await deleteTask(id);
+      await deleteTask(id); // Only pass the taskId
       const updated = tasks.filter((t) => t.id !== id);
       setTasks(updated);
       await localforage.setItem(TASKS_CACHE_KEY, updated);
@@ -82,7 +85,10 @@ const TaskList: React.FC = () => {
                 businessId={businessId}
                 context="task"
               />
-              <button onClick={() => handleRemove(task.id)} className="mt-2 text-red-600 hover:underline">
+              <button
+                onClick={() => handleRemove(task.id)}
+                className="mt-2 text-red-600 hover:underline"
+              >
                 Delete
               </button>
             </li>

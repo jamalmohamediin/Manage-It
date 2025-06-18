@@ -1,60 +1,53 @@
 // src/firebase/storage.ts
-import { storage, db } from './firebase-config';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { storage } from './firebase-config';
 
-/**
- * Upload file specific to a patient (used in legacy PatientForm/PatientList logic)
- */
-export async function uploadFileForPatient(file: File, patientId: string, uploadedBy: string) {
-  const path = `uploads/${patientId}/${uploadedBy}/${file.name}`;
-  const storageRef = ref(storage, path);
-  const result = await uploadBytes(storageRef, file);
-  const downloadURL = await getDownloadURL(result.ref);
-
-  await addDoc(collection(db, 'uploads'), {
-    patientId,
-    uploadedBy,
-    fileName: file.name,
-    fileUrl: downloadURL,
-    timestamp: serverTimestamp(),
-  });
-
-  return downloadURL;
+export async function uploadFileForPatient(
+  file: File, 
+  patientId: string, 
+  businessId: string, 
+  role: string
+): Promise<string> {
+  try {
+    // Create a reference to the file in Firebase Storage
+    const fileName = `${Date.now()}_${file.name}`;
+    const fileRef = ref(storage, `patients/${businessId}/${patientId}/${fileName}`);
+    
+    // Upload the file
+    const snapshot = await uploadBytes(fileRef, file);
+    
+    // Get the download URL
+    const downloadURL = await getDownloadURL(snapshot.ref);
+    
+    return downloadURL;
+  } catch (error) {
+    console.error('Error uploading file:', error);
+    throw new Error('Failed to upload file');
+  }
 }
 
-/**
- * Reusable uploader for doctors, receptionists, and other roles across the app
- */
-export async function uploadFileForUserRole({
-  file,
-  userId,
-  businessId,
-  role,
-  context,
-}: {
-  file: File;
-  userId: string;
-  businessId: string;
-  role: string;
-  context?: string;
-}) {
-  const timestamp = Date.now();
-  const filename = `${timestamp}_${file.name}`;
-  const path = `uploads/${businessId}/${role}/${userId}/${context || 'general'}/${filename}`;
-  const storageRef = ref(storage, path);
-  const result = await uploadBytes(storageRef, file);
-  const downloadURL = await getDownloadURL(result.ref);
-
-  await addDoc(collection(db, 'uploads'), {
-    businessId,
-    userId,
-    role,
-    fileName: file.name,
-    fileUrl: downloadURL,
-    context: context || 'general',
-    uploadedAt: serverTimestamp(),
-  });
-
-  return downloadURL;
+// Add the generic uploadFile function for FileUploader component
+export async function uploadFile(
+  file: File,
+  userId: string,
+  businessId: string,
+  role: string,
+  context: string
+): Promise<string> {
+  try {
+    // Create a reference to the file in Firebase Storage
+    const fileName = `${Date.now()}_${file.name}`;
+    const fileRef = ref(storage, `${context}/${businessId}/${userId}/${fileName}`);
+    
+    // Upload the file
+    const snapshot = await uploadBytes(fileRef, file);
+    
+    // Get the download URL
+    const downloadURL = await getDownloadURL(snapshot.ref);
+    
+    return downloadURL;
+  } catch (error) {
+    console.error('Error uploading file:', error);
+    throw new Error('Failed to upload file');
+  }
 }
