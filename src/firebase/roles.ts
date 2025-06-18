@@ -10,49 +10,42 @@ import {
   doc,
   serverTimestamp,
 } from 'firebase/firestore';
+import { UserRole } from '../types';
 
 const rolesCollection = collection(db, 'roles');
 
-// Add a role for a user
-export async function addUserRole(userId: string, role: string, businessId?: string) {
+// ✅ Assign role (prevent duplicates)
+export async function addUserRole(role: UserRole) {
+  const q = query(
+    rolesCollection,
+    where('userId', '==', role.userId),
+    where('role', '==', role.role)
+  );
+  const snapshot = await getDocs(q);
+  if (!snapshot.empty) {
+    throw new Error('Role already assigned to this user.');
+  }
+
   await addDoc(rolesCollection, {
-    userId,
-    role,
-    businessId: businessId || '',
+    ...role,
     assignedAt: serverTimestamp(),
   });
 }
 
-// Get all roles (for admin view)
-export async function fetchAllRoles() {
+// ✅ Get all roles
+export async function fetchAllRoles(): Promise<UserRole[]> {
   const snapshot = await getDocs(rolesCollection);
-  return snapshot.docs.map(doc => ({
-    id: doc.id,
-    ...doc.data(),
-  })) as Array<{
-    id: string;
-    userId: string;
-    role: string;
-    businessId?: string;
-  }>;
+  return snapshot.docs.map(doc => doc.data() as UserRole);
 }
 
-// Get roles assigned to a specific user
-export async function getUserRoles(userId: string) {
+// ✅ Get roles by user ID
+export async function getUserRoles(userId: string): Promise<UserRole[]> {
   const q = query(rolesCollection, where('userId', '==', userId));
   const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => ({
-    id: doc.id,
-    ...doc.data(),
-  })) as Array<{
-    id: string;
-    userId: string;
-    role: string;
-    businessId?: string;
-  }>;
+  return snapshot.docs.map(doc => doc.data() as UserRole);
 }
 
-// Remove a specific role assignment for a user
+// ✅ Remove a specific role assignment
 export async function removeRoleAssignment(userId: string, role: string) {
   const q = query(rolesCollection, where('userId', '==', userId), where('role', '==', role));
   const snapshot = await getDocs(q);
