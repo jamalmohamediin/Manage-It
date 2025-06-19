@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@firebasegen/default-connector": "file:dataconnect-generated/js/default-connector",
+    "dayjs": "^1.11.13",
     "firebase": "^11.9.1",
     "localforage": "^1.10.0",
     "lucide-react": "^0.515.0",

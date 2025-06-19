@@ -1,24 +1,26 @@
 // src/firebase/businesses.ts
+import { collection, addDoc, getDocs } from 'firebase/firestore';
 import { db } from './firebase-config';
-import { collection, addDoc, getDocs, Timestamp } from 'firebase/firestore';
 
-export type Business = {
-  id?: string;
+export interface Business {
+  id: string;
   name: string;
   industry?: string;
-  createdAt: Timestamp;
-};
+  createdAt?: Date;
+}
 
-const businessCol = collection(db, 'businesses');
+// Add full business object
+export async function addBusiness(data: { name: string; industry?: string; createdAt: Date }): Promise<void> {
+  await addDoc(collection(db, 'businesses'), data);
+}
 
-export const addBusiness = async (biz: Omit<Business, 'id'>) => {
-  await addDoc(businessCol, biz);
-};
-
-export const getAllBusinesses = async (): Promise<Business[]> => {
-  const snapshot = await getDocs(businessCol);
+// Get all businesses
+export async function getAllBusinesses(): Promise<Business[]> {
+  const snapshot = await getDocs(collection(db, 'businesses'));
   return snapshot.docs.map((doc) => ({
     id: doc.id,
-    ...(doc.data() as Business),
+    name: doc.data().name,
+    industry: doc.data().industry,
+    createdAt: doc.data().createdAt?.toDate(),
   }));
-};
+}

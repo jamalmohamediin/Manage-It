@@ -13,13 +13,16 @@ const firebaseConfig = {
   measurementId: "G-K97735R82K"
 };
 
-// ✅ Initialize Firebase app
+// ✅ Initialize Firebase App
 export const app = initializeApp(firebaseConfig);
 
-// ✅ Firestore with new offline persistence system
+// ✅ Firestore with offline persistence
 export const db = initializeFirestore(app, {
   localCache: persistentLocalCache(),
 });
+
+// ✅ Export alias for compatibility with older code
+export const firestore = db;
 
 // ✅ Firebase Storage
 export const storage = getStorage(app);

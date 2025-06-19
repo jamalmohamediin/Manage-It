@@ -1,100 +1,76 @@
-// src/components/TaskList.tsx
 import React, { useEffect, useState } from 'react';
-import localforage from 'localforage';
-import { getTasks, deleteTask } from '../firebase/tasks';
 import { Task } from '../types';
-import FileUploader from './FileUploader';
+import { getTasks } from '../firebase/tasks';
 import { useBusinessId } from '../hooks/useBusinessId';
-import { toast } from 'react-hot-toast';
+import localforage from 'localforage';
 
-const TASKS_CACHE_KEY = 'cachedTasks';
+const LOCAL_KEY_PREFIX = "tasks_cache_"; // Unique per business
 
 const TaskList: React.FC = () => {
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [online, setOnline] = useState(navigator.onLine);
-  const [loading, setLoading] = useState(true);
   const businessId = useBusinessId();
-  const role = 'Doctor';
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [loading, setLoading] = useState(true);
 
+  // Load tasks from local cache first (for instant/offline display)
   useEffect(() => {
-    const updateStatus = () => setOnline(navigator.onLine);
-    window.addEventListener('online', updateStatus);
-    window.addEventListener('offline', updateStatus);
-    return () => {
-      window.removeEventListener('online', updateStatus);
-      window.removeEventListener('offline', updateStatus);
-    };
-  }, []);
-
-  useEffect(() => {
-    const loadTasks = async () => {
-      if (online) {
-        try {
-          const fetched = await getTasks(businessId);
-          setTasks(fetched);
-          await localforage.setItem(TASKS_CACHE_KEY, fetched);
-        } catch (err) {
-          toast.error('Failed to fetch tasks online. Using cached data.');
-          const cached = await localforage.getItem<Task[]>(TASKS_CACHE_KEY);
-          if (cached) setTasks(cached);
-        } finally {
-          setLoading(false);
-        }
-      } else {
-        const cached = await localforage.getItem<Task[]>(TASKS_CACHE_KEY);
-        if (cached) setTasks(cached);
-        setLoading(false);
+    if (!businessId) return;
+    const key = LOCAL_KEY_PREFIX + businessId;
+    localforage.getItem<Task[]>(key).then((cached) => {
+      if (cached && Array.isArray(cached)) {
+        setTasks(cached);
       }
-    };
+      setLoading(false);
+    });
+  }, [businessId]);
 
-    loadTasks();
-  }, [online, businessId]);
-
-  // Fixed: Remove the second parameter (businessId) from deleteTask call
-  const handleRemove = async (id: string | undefined) => {
-    if (!id) return;
-    try {
-      await deleteTask(id); // Only pass the taskId
-      const updated = tasks.filter((t) => t.id !== id);
-      setTasks(updated);
-      await localforage.setItem(TASKS_CACHE_KEY, updated);
-      toast.success('Task removed');
-    } catch {
-      toast.error('Failed to delete task');
-    }
-  };
-
-  if (loading) return <p>Loading tasks...</p>;
+  // Then fetch from Firestore and update cache
+  useEffect(() => {
+    if (!businessId) return;
+    setLoading(true);
+    getTasks(businessId)
+      .then((remoteTasks) => {
+        setTasks(remoteTasks);
+        // Save latest to cache
+        const key = LOCAL_KEY_PREFIX + businessId;
+        localforage.setItem(key, remoteTasks);
+      })
+      .catch(() => {
+        // If Firestore fails (offline), just keep local cache
+      })
+      .finally(() => setLoading(false));
+  }, [businessId]);
 
   return (
-    <div>
-      <h2 className="text-xl font-bold text-[#3b2615] mb-4">
-        Task List {online ? '(Online)' : '(Offline)'}
-      </h2>
-      {tasks.length === 0 ? (
-        <p className="text-gray-500">No tasks available.</p>
-      ) : (
-        <ul className="space-y-4">
-          {tasks.map((task) => (
-            <li key={task.id} className="p-4 bg-white border rounded shadow">
-              <p><strong>{task.title}</strong></p>
-              <p>{task.description}</p>
-              <FileUploader
-                userId={task.id ?? ''}
-                role={role}
-                businessId={businessId}
-                context="task"
-              />
-              <button
-                onClick={() => handleRemove(task.id)}
-                className="mt-2 text-red-600 hover:underline"
-              >
-                Delete
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+    <div className="p-4 bg-white rounded shadow">
+      <h2 className="text-xl font-bold text-[#3b2615]">Task List</h2>
+      <div className="mt-4 overflow-x-auto">
+        {loading ? (
+          <div className="py-8 text-center text-gray-400">Loading tasks...</div>
+        ) : tasks.length === 0 ? (
+          <div className="py-8 text-center text-gray-400">No tasks found.</div>
+        ) : (
+          <table className="min-w-full border-collapse table-auto">
+            <thead>
+              <tr className="bg-[#f5f5f5] text-[#3b2615]">
+                <th className="px-4 py-2 border">Title</th>
+                <th className="px-4 py-2 border">Description</th>
+                <th className="px-4 py-2 border">Assigned To</th>
+                <th className="px-4 py-2 border">Due Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              {tasks.map((task) => (
+                <tr key={task.id} className="hover:bg-[#f9f9f9]">
+                  <td className="px-4 py-2 border">{task.title}</td>
+                  <td className="px-4 py-2 border">{task.description || '-'}</td>
+                  <td className="px-4 py-2 border">{task.assignedTo || '-'}</td>
+                  <td className="px-4 py-2 border">{task.dueDate || '-'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
     </div>
   );
 };

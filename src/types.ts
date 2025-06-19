@@ -1,31 +1,38 @@
+export interface Task {
+  id?: string;
+  title: string;
+  description?: string;
+  assignedTo?: string;
+  dueDate?: string;
+  businessId: string;
+}
+
 export interface Patient {
-  id: string;
+  id?: string;
   fullName: string;
   gender: string;
   idNumber: string;
   dob: string;
   age: string;
-  religion: string;
-  medicalAidName: string;
-  medicalAidNumber: string;
-  medicalAidMainMember: string;
-  emergencyContact1: { name: string; phone: string };
-  emergencyContact2: { name: string; phone: string };
   address: string;
-  createdAt: any;
-  updatedAt: any;
-  businessId: string;
-}
-
-export interface Task {
-  id: string;
-  title: string;
-  description: string;
   businessId: string;
 }
 
 export interface UserRole {
+  id?: string;
   userId: string;
-  role: 'Admin' | 'Doctor' | 'Receptionist';
+  role: string;
   businessId: string;
+  permissions?: string[];
+  expiresAt?: string;
+  createdAt?: any;
+  updatedAt?: any;
+}
+export interface Notification {
+  id: string;
+  userId: string;
+  title: string;
+  message: string;
+  read: boolean;
+  createdAt: Date;
 }

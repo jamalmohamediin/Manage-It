@@ -1,25 +1,31 @@
-// src/firebase/tasks.ts
 import { db } from './firebase-config';
-import { collection, getDocs, deleteDoc, doc, addDoc, Timestamp } from 'firebase/firestore';
+import {
+  collection,
+  addDoc,
+  getDocs,
+  query,
+  where,
+} from 'firebase/firestore';
 import { Task } from '../types';
 
-export async function getTasks(businessId: string): Promise<Task[]> {
-  const snapshot = await getDocs(collection(db, 'tasks'));
-  return snapshot.docs
-    .map((doc) => ({ id: doc.id, ...doc.data() } as Task))
-    .filter((task) => task.businessId === businessId);
-}
+const TASKS_COLLECTION = 'tasks';
 
-export async function deleteTask(taskId: string): Promise<void> {
-  await deleteDoc(doc(db, 'tasks', taskId));
-}
-
-// Add the missing addTask function
-export async function addTask(taskData: { title: string }, businessId: string): Promise<void> {
-  await addDoc(collection(db, 'tasks'), {
-    ...taskData,
+export const addTask = async (task: Omit<Task, 'id'>, businessId: string) => {
+  const docRef = await addDoc(collection(db, TASKS_COLLECTION), {
+    ...task,
     businessId,
-    createdAt: Timestamp.now(),
-    updatedAt: Timestamp.now(),
   });
-}
+  return docRef.id;
+};
+
+export const getTasks = async (businessId: string): Promise<Task[]> => {
+  const q = query(
+    collection(db, TASKS_COLLECTION),
+    where('businessId', '==', businessId)
+  );
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map((doc) => ({
+    id: doc.id,
+    ...doc.data(),
+  })) as Task[];
+};

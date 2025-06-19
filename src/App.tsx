@@ -1,102 +1,54 @@
 // src/App.tsx
-import React, { useState } from 'react';
+
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import PatientForm from './components/PatientForm';
 import PatientList from './components/PatientList';
-import RoleForm from './components/RoleForm';
-import RoleList from './components/RoleList';
 import TaskForm from './components/TaskForm';
 import TaskList from './components/TaskList';
 import AppointmentForm from './components/AppointmentForm';
-import { Toaster } from 'react-hot-toast';
+import RoleForm from './components/RoleForm';
+import RoleList from './components/RoleList';
+import BusinessSelector from './components/BusinessSelector';
+import NotificationBell from './components/NotificationBell';
+import UserSwitcher from './components/UserSwitcher';
+import { BusinessProvider } from './contexts/BusinessContext';
+import { UserProvider } from './contexts/UserContext';
 
 const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'patients' | 'roles' | 'tasks' | 'appointments'>('patients');
-  const [currentRole, setCurrentRole] = useState<'Admin' | 'Doctor' | 'Receptionist'>('Admin');
-
   return (
-    <div className="min-h-screen p-6 bg-[#f9f5f0] text-[#3b2615]">
-      <Toaster position="top-center" />
-      <h1 className="mb-4 text-3xl font-bold">Manage It</h1>
+    <UserProvider>
+      <BusinessProvider>
+        <Router>
+          <div className="relative p-4 space-y-6">
+            {/* Header */}
+            <header className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <h1 className="text-3xl font-bold text-[#3b2615]">Manage It</h1>
+                <UserSwitcher />
+              </div>
+              <NotificationBell />
+            </header>
 
-      {/* Role switcher */}
-      <div className="mb-4">
-        <label className="mr-2 font-semibold">Current Role:</label>
-        <select
-          value={currentRole}
-          onChange={(e) => setCurrentRole(e.target.value as 'Admin' | 'Doctor' | 'Receptionist')}
-          className="p-2 border rounded"
-        >
-          <option value="Admin">Admin</option>
-          <option value="Doctor">Doctor</option>
-          <option value="Receptionist">Receptionist</option>
-        </select>
-      </div>
+            {/* Business Selector at the top */}
+            <div className="max-w-md mx-auto">
+              <BusinessSelector />
+            </div>
 
-      {/* Navigation */}
-      <div className="flex mb-6 space-x-4">
-        <button
-          onClick={() => setActiveTab('patients')}
-          className={`px-4 py-2 rounded ${
-            activeTab === 'patients' ? 'bg-[#3b2615] text-white' : 'bg-white border'
-          }`}
-        >
-          Patients
-        </button>
-        <button
-          onClick={() => setActiveTab('roles')}
-          className={`px-4 py-2 rounded ${
-            activeTab === 'roles' ? 'bg-[#3b2615] text-white' : 'bg-white border'
-          }`}
-        >
-          Roles
-        </button>
-        <button
-          onClick={() => setActiveTab('tasks')}
-          className={`px-4 py-2 rounded ${
-            activeTab === 'tasks' ? 'bg-[#3b2615] text-white' : 'bg-white border'
-          }`}
-        >
-          Tasks
-        </button>
-        <button
-          onClick={() => setActiveTab('appointments')}
-          className={`px-4 py-2 rounded ${
-            activeTab === 'appointments' ? 'bg-[#3b2615] text-white' : 'bg-white border'
-          }`}
-        >
-          Appointments
-        </button>
-      </div>
-
-      {/* Tab Content */}
-      {activeTab === 'patients' && (
-        <>
-          {currentRole === 'Receptionist' && <PatientForm />}
-<PatientList currentRole={currentRole} />
-        </>
-      )}
-
-      {activeTab === 'roles' && currentRole === 'Admin' && (
-        <>
-          <RoleForm />
-          <RoleList />
-        </>
-      )}
-
-      {activeTab === 'tasks' && (
-        <>
-          {currentRole !== 'Receptionist' && <TaskForm />}
-          <TaskList />
-        </>
-      )}
-
-      {activeTab === 'appointments' && (
-        <>
-          {currentRole !== 'Admin' && <AppointmentForm />}
-          {currentRole === 'Admin' && <p className="text-gray-600">Admins cannot book appointments.</p>}
-        </>
-      )}
-    </div>
+            {/* App Routes */}
+            <Routes>
+              <Route path="/" element={<PatientForm />} />
+              <Route path="/patients" element={<PatientList />} />
+              <Route path="/tasks/new" element={<TaskForm />} />
+              <Route path="/tasks" element={<TaskList />} />
+              <Route path="/appointments" element={<AppointmentForm />} />
+              <Route path="/roles" element={<RoleForm />} />
+              <Route path="/roles/list" element={<RoleList />} />
+            </Routes>
+          </div>
+        </Router>
+      </BusinessProvider>
+    </UserProvider>
   );
 };
 
