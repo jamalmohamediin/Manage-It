@@ -1,53 +1,52 @@
-// src/firebase/storage.ts
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytes, getDownloadURL, listAll } from 'firebase/storage';
 import { storage } from './firebase-config';
+import { db } from './firebase-config';
+import { collection, addDoc, Timestamp, getDocs } from 'firebase/firestore';
 
-export async function uploadFileForPatient(
-  file: File, 
-  patientId: string, 
-  businessId: string, 
-  role: string
+// Universal uploader with metadata (Storage + Firestore)
+export async function uploadFileWithMetadata(
+  file: File,
+  itemId: string,              // patientId, taskId, roleId, etc.
+  businessId: string,
+  role: string,                // uploader's role
+  context: 'patients' | 'tasks' | 'roles',
+  uploadedBy: string,          // uploader's userId
+  uploaderName: string         // uploader's real name
 ): Promise<string> {
   try {
-    // Create a reference to the file in Firebase Storage
+    // 1. Upload to Storage with modular path
     const fileName = `${Date.now()}_${file.name}`;
-    const fileRef = ref(storage, `patients/${businessId}/${patientId}/${fileName}`);
-    
-    // Upload the file
+    const fileRef = ref(storage, `uploads/${businessId}/${role}/${uploadedBy}/${fileName}`);
     const snapshot = await uploadBytes(fileRef, file);
-    
-    // Get the download URL
     const downloadURL = await getDownloadURL(snapshot.ref);
-    
+
+    // 2. Save metadata in Firestore subcollection (uploads)
+    const meta = {
+      fileName,
+      fileURL: downloadURL,
+      uploadedBy,
+      uploaderName,
+      uploadedAt: Timestamp.now(),
+      context,
+      role
+    };
+    // e.g., patients/{id}/uploads or tasks/{id}/uploads
+    await addDoc(collection(db, `${context}/${itemId}/uploads`), meta);
     return downloadURL;
   } catch (error) {
-    console.error('Error uploading file:', error);
+    console.error('Error uploading file with metadata:', error);
     throw new Error('Failed to upload file');
   }
 }
 
-// Add the generic uploadFile function for FileUploader component
-export async function uploadFile(
-  file: File,
-  userId: string,
-  businessId: string,
-  role: string,
-  context: string
-): Promise<string> {
-  try {
-    // Create a reference to the file in Firebase Storage
-    const fileName = `${Date.now()}_${file.name}`;
-    const fileRef = ref(storage, `${context}/${businessId}/${userId}/${fileName}`);
-    
-    // Upload the file
-    const snapshot = await uploadBytes(fileRef, file);
-    
-    // Get the download URL
-    const downloadURL = await getDownloadURL(snapshot.ref);
-    
-    return downloadURL;
-  } catch (error) {
-    console.error('Error uploading file:', error);
-    throw new Error('Failed to upload file');
-  }
+// Load uploads metadata from Firestore for display (per patient/task/role)
+export async function getUploadsForItem(
+  context: 'patients' | 'tasks' | 'roles',
+  itemId: string
+): Promise<{ id: string; fileName: string; fileURL: string; uploadedBy: string; uploaderName?: string; uploadedAt: any; role?: string }[]> {
+  const snap = await getDocs(collection(db, `${context}/${itemId}/uploads`));
+  return snap.docs.map(doc => ({
+    id: doc.id,
+    ...(doc.data() as any)
+  }));
 }

@@ -1,4 +1,3 @@
-// src/firebase/patients.ts
 import { db } from './firebase-config';
 import { collection, addDoc, getDocs, query, where, Timestamp } from 'firebase/firestore';
 import { Patient } from '../types';

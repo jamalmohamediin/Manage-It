@@ -1,3 +1,5 @@
+// src/types.ts
+
 export interface Task {
   id?: string;
   title: string;
@@ -5,6 +7,8 @@ export interface Task {
   assignedTo?: string;
   dueDate?: string;
   businessId: string;
+  status: 'pending' | 'in progress' | 'done'; // New status field
+  notes: string; // New notes field
 }
 
 export interface Patient {
@@ -28,11 +32,26 @@ export interface UserRole {
   createdAt?: any;
   updatedAt?: any;
 }
+
 export interface Notification {
   id: string;
   userId: string;
   title: string;
-  message: string;
+  body: string;
   read: boolean;
-  createdAt: Date;
+  createdAt: any;
+  metaType?: string;
+  role?: string;
+  expiryDate?: string;
+}
+
+export interface Appointment {
+  id?: string;
+  patientId: string;
+  businessId: string;
+  date: string;
+  reason: string;
+  doctorId?: string;
+  createdAt?: any;
+  updatedAt?: any;
 }

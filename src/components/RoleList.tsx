@@ -1,10 +1,12 @@
-import React, { useEffect, useState } from 'react';
-import { fetchAllRoles, removeRoleAssignment } from '../firebase/roles';
+import React, { useEffect, useState, useContext } from 'react';
+import { fetchAllRoles, removeRoleAssignment, notifyExpiringRoles } from '../firebase/roles';
 import { UserRole } from '../types';
 import { useBusinessId } from '../hooks/useBusinessId';
 import { toast } from 'react-hot-toast';
 import dayjs from 'dayjs';
 import localforage from 'localforage';
+import FileUploaderModal from './FileUploaderModal';
+import { UserContext } from '../contexts/UserContext';
 
 const LOCAL_KEY_PREFIX = "roles_cache_"; // Unique per business
 
@@ -12,6 +14,18 @@ const RoleList: React.FC = () => {
   const businessId = useBusinessId();
   const [roles, setRoles] = useState<UserRole[]>([]);
   const [loading, setLoading] = useState(true);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
+
+  const { userId, users } = useContext(UserContext);
+  const uploaderName = users.find(u => u.id === userId)?.name || "Unknown";
+
+  // Trigger expiring role notification check
+  useEffect(() => {
+    if (businessId) {
+      notifyExpiringRoles(businessId);
+    }
+  }, [businessId]);
 
   // Load roles from local cache first
   useEffect(() => {
@@ -67,6 +81,16 @@ const RoleList: React.FC = () => {
     return expiry.isValid() && expiry.diff(now, 'day') <= 7;
   };
 
+  const openModal = (roleId: string) => {
+    setSelectedRoleId(roleId);
+    setModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setModalOpen(false);
+    setSelectedRoleId(null);
+  };
+
   return (
     <div className="p-4 bg-white rounded shadow">
       <h2 className="text-xl font-bold text-[#3b2615]">User Roles</h2>
@@ -79,6 +103,7 @@ const RoleList: React.FC = () => {
               <th className="px-4 py-2 border">User ID</th>
               <th className="px-4 py-2 border">Role</th>
               <th className="px-4 py-2 border">Expires At</th>
+              <th className="px-4 py-2 border">Files</th>
               <th className="px-4 py-2 border">Actions</th>
             </tr>
           </thead>
@@ -103,6 +128,14 @@ const RoleList: React.FC = () => {
                 </td>
                 <td className="px-4 py-2 border">
                   <button
+                    className="px-2 py-1 text-xs rounded bg-brown-200 hover:bg-brown-300"
+                    onClick={() => openModal(r.id!)}
+                  >
+                    📎 Upload/View
+                  </button>
+                </td>
+                <td className="px-4 py-2 border">
+                  <button
                     onClick={() => handleRemove(r.userId, r.role)}
                     className="text-red-500 hover:underline"
                   >
@@ -113,6 +146,18 @@ const RoleList: React.FC = () => {
             ))}
           </tbody>
         </table>
+      )}
+      {/* File Modal */}
+      {modalOpen && selectedRoleId && businessId && (
+        <FileUploaderModal
+          itemId={selectedRoleId}
+          businessId={businessId}
+          context="roles"
+          open={modalOpen}
+          onClose={closeModal}
+          userId={userId}
+          uploaderName={uploaderName}
+        />
       )}
     </div>
   );

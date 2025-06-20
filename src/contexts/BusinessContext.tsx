@@ -1,4 +1,3 @@
-// src/contexts/BusinessContext.tsx
 import React, { createContext, useContext, useState } from 'react';
 
 interface BusinessContextType {

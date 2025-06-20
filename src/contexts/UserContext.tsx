@@ -4,15 +4,15 @@ import React, { createContext, useState } from "react";
 
 // Dummy users for testing - expand as needed
 const users = [
-  { id: "user1", name: "Dr. Alex" },
-  { id: "user2", name: "Receptionist Zoe" },
-  { id: "user3", name: "Admin Sam" },
+  { id: "user1", name: "Dr. Alex", role: "doctor" },
+  { id: "user2", name: "Receptionist Zoe", role: "receptionist" },
+  { id: "user3", name: "Admin Sam", role: "admin" },
 ];
 
 interface UserContextType {
   userId: string;
   setUserId: (id: string) => void;
-  users: { id: string; name: string }[];
+  users: { id: string; name: string; role: string }[];
 }
 
 export const UserContext = createContext<UserContextType>({

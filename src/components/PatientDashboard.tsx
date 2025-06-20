@@ -1,64 +1,59 @@
-// src/components/PatientDashboard.tsx
-import React, { useEffect, useState } from 'react';
-import { collection, onSnapshot, Timestamp } from 'firebase/firestore';
-import { db } from '../firebase/firebase-config';
-import localforage from 'localforage';
+import React, { useEffect, useState } from "react";
+import { getPatients } from "../firebase/patients";
+import { getAppointments } from "../firebase/appointments";
+import { useBusinessId } from "../hooks/useBusinessId";
+import { Patient, Appointment } from "../types";
 
 const PatientDashboard: React.FC = () => {
-  const [total, setTotal] = useState(0);
-  const [todayCount, setTodayCount] = useState(0);
-  const [cachedCount, setCachedCount] = useState(0);
-  const [online, setOnline] = useState(navigator.onLine);
+  const businessId = useBusinessId();
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const updateOnlineStatus = () => setOnline(navigator.onLine);
-    window.addEventListener('online', updateOnlineStatus);
-    window.addEventListener('offline', updateOnlineStatus);
-    return () => {
-      window.removeEventListener('online', updateOnlineStatus);
-      window.removeEventListener('offline', updateOnlineStatus);
-    };
-  }, []);
-
-  useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'patients'), (snapshot) => {
-      const all = snapshot.docs.map((doc) => doc.data());
-      setTotal(all.length);
-
-      const today = new Date();
-      const startOfDay = Timestamp.fromDate(new Date(today.setHours(0, 0, 0, 0)));
-      const todayPatients = all.filter(
-        (p: any) => p.createdAt?.seconds >= startOfDay.seconds
-      );
-      setTodayCount(todayPatients.length);
+    if (!businessId) return;
+    Promise.all([
+      getPatients(businessId),
+      getAppointments(businessId),
+    ]).then(([patList, appList]) => {
+      setPatients(patList);
+      setAppointments(appList);
+      setLoading(false);
     });
+  }, [businessId]);
 
-    return () => unsub();
-  }, []);
-
-  useEffect(() => {
-    if (!online) {
-      localforage.getItem<any[]>('cachedPatients').then((data) => {
-        if (data) setCachedCount(data.length);
-      });
-    }
-  }, [online]);
+  // Visits per patient
+  const getVisitCount = (patientId: string) =>
+    appointments.filter((a) => a.patientId === patientId).length;
 
   return (
-    <div className="grid grid-cols-1 gap-4 mb-6 md:grid-cols-3">
-      <div className="p-4 text-white bg-[#5c3a21] rounded shadow">
-        <p className="text-sm">Total Patients</p>
-        <h3 className="text-2xl font-bold">{total}</h3>
-      </div>
-      <div className="p-4 text-white bg-[#3b2615] rounded shadow">
-        <p className="text-sm">Registered Today</p>
-        <h3 className="text-2xl font-bold">{todayCount}</h3>
-      </div>
-      {!online && (
-        <div className="p-4 text-white bg-gray-600 rounded shadow">
-          <p className="text-sm">Cached Offline</p>
-          <h3 className="text-2xl font-bold">{cachedCount}</h3>
-        </div>
+    <div className="max-w-4xl p-6 mx-auto bg-white shadow rounded-xl">
+      <h2 className="text-2xl font-bold text-[#3b2615] mb-6">Patient Dashboard</h2>
+      {loading ? (
+        <p>Loading...</p>
+      ) : (
+        <table className="min-w-full border-collapse table-auto">
+          <thead>
+            <tr className="bg-[#f5f5f5] text-[#3b2615]">
+              <th className="px-4 py-2 border">Full Name</th>
+              <th className="px-4 py-2 border">Gender</th>
+              <th className="px-4 py-2 border">Age</th>
+              <th className="px-4 py-2 border">Visits</th>
+            </tr>
+          </thead>
+          <tbody>
+            {patients.map((p) => (
+              <tr key={p.id} className="hover:bg-[#f9f9f9]">
+                <td className="px-4 py-2 border">{p.fullName}</td>
+                <td className="px-4 py-2 border">{p.gender}</td>
+                <td className="px-4 py-2 border">{p.age}</td>
+                <td className="px-4 py-2 font-semibold border text-brown-800">
+                  {getVisitCount(p.id!)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       )}
     </div>
   );

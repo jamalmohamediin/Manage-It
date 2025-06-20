@@ -1,17 +1,51 @@
-import { firestore } from './firebase-config';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+// src/firebase/appointments.ts
+import { db } from './firebase-config';
+import {
+  collection,
+  addDoc,
+  getDocs,
+  query,
+  where,
+  Timestamp,
+  orderBy,
+  updateDoc,
+  doc,
+  deleteDoc,
+} from 'firebase/firestore';
+import { Appointment } from '../types';
 
-export interface Appointment {
-  patientName: string;
-  date: string;
-  time: string;
-  reason: string;
-  businessId: string;
+// Add a new appointment
+export async function addAppointment(data: Omit<Appointment, 'id'>) {
+  await addDoc(collection(db, 'appointments'), {
+    ...data,
+    createdAt: Timestamp.now(),
+    updatedAt: Timestamp.now(),
+  });
 }
 
-export const addAppointment = async (appointment: Appointment) => {
-  await addDoc(collection(firestore, 'appointments'), {
-    ...appointment,
-    createdAt: serverTimestamp(),
+// Get all appointments for the current business
+export async function getAppointments(businessId: string): Promise<Appointment[]> {
+  const q = query(
+    collection(db, 'appointments'),
+    where('businessId', '==', businessId),
+    orderBy('date', 'asc')
+  );
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({
+    id: doc.id,
+    ...(doc.data() as Omit<Appointment, 'id'>),
+  }));
+}
+
+// Update appointment
+export async function updateAppointment(id: string, data: Partial<Appointment>) {
+  await updateDoc(doc(db, 'appointments', id), {
+    ...data,
+    updatedAt: Timestamp.now(),
   });
-};
+}
+
+// Delete appointment
+export async function deleteAppointment(id: string) {
+  await deleteDoc(doc(db, 'appointments', id));
+}

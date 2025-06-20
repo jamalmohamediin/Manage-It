@@ -1,14 +1,13 @@
-// src/components/BusinessSelector.tsx
 import React, { useEffect, useState } from 'react';
 import { getAllBusinesses, Business } from '../firebase/businesses';
-import { useBusinessContext } from '../contexts/BusinessContext'; 
+import { useBusinessContext } from '../contexts/BusinessContext';
 
 const BusinessSelector: React.FC = () => {
   const { businessId, setBusinessId } = useBusinessContext();
   const [businesses, setBusinesses] = useState<Business[]>([]);
 
   useEffect(() => {
-    getAllBusinesses().then((data) => setBusinesses(data));
+    getAllBusinesses().then(setBusinesses);
   }, []);
 
   return (
@@ -19,8 +18,8 @@ const BusinessSelector: React.FC = () => {
     >
       <option value="">Select Business</option>
       {businesses.map((b) => (
-        <option key={b.id} value={b.id!}>
-          {b.name}
+        <option key={b.id} value={b.id}>
+          {b.name} {b.industry ? `- ${b.industry}` : ""}
         </option>
       ))}
     </select>

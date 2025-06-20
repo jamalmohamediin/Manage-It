@@ -1,5 +1,4 @@
-// src/firebase/businesses.ts
-import { collection, addDoc, getDocs } from 'firebase/firestore';
+import { collection, addDoc, getDocs, serverTimestamp } from 'firebase/firestore';
 import { db } from './firebase-config';
 
 export interface Business {
@@ -10,17 +9,23 @@ export interface Business {
 }
 
 // Add full business object
-export async function addBusiness(data: { name: string; industry?: string; createdAt: Date }): Promise<void> {
-  await addDoc(collection(db, 'businesses'), data);
+export async function addBusiness(data: { name: string; industry?: string }): Promise<void> {
+  await addDoc(collection(db, 'businesses'), {
+    ...data,
+    createdAt: serverTimestamp(),
+  });
 }
 
 // Get all businesses
 export async function getAllBusinesses(): Promise<Business[]> {
   const snapshot = await getDocs(collection(db, 'businesses'));
-  return snapshot.docs.map((doc) => ({
-    id: doc.id,
-    name: doc.data().name,
-    industry: doc.data().industry,
-    createdAt: doc.data().createdAt?.toDate(),
-  }));
+  return snapshot.docs.map((doc) => {
+    const d = doc.data();
+    return {
+      id: doc.id,
+      name: d.name,
+      industry: d.industry,
+      createdAt: d.createdAt?.toDate ? d.createdAt.toDate() : undefined,
+    };
+  });
 }

@@ -1,48 +1,60 @@
-// src/components/FileUploader.tsx
-import React, { useState } from 'react';
-import { uploadFile } from '../firebase/storage';
+import React, { useState } from "react";  // Ensure you import useState and useEffect from React
+import { storage } from "../firebase/firebase-config";
+import { ref, uploadBytesResumable } from "firebase/storage";
 
-type Props = {
-  userId: string;
-  role: 'Admin' | 'Doctor' | 'Receptionist';
-  businessId: string;
-  context: string;
-};
-
-const FileUploader: React.FC<Props> = ({ userId, role, businessId, context }) => {
+const FileUploader = ({ patientId }: { patientId: string }) => {
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
 
-  const handleUpload = async () => {
-    if (!file) return;
-    
-    setUploading(true);
-    try {
-      await uploadFile(file, userId, businessId, role, context);
-      alert('Upload successful');
-      setFile(null); // Clear the file after successful upload
-    } catch (err) {
-      console.error(err);
-      alert('Upload failed');
-    } finally {
-      setUploading(false);
+  const handleUpload = () => {
+    if (!file) {
+      alert("Please select a file first.");
+      return;
     }
+
+    const storageRef = ref(storage, `patients/${patientId}/${file.name}`);
+    const uploadTask = uploadBytesResumable(storageRef, file);
+
+    setUploading(true);
+
+    uploadTask.on(
+      "state_changed",
+      (snapshot) => {
+        const prog = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+        setProgress(prog);
+      },
+      (error) => {
+        alert("Upload failed: " + error.message);
+        setUploading(false);
+      },
+      () => {
+        alert("Upload successful!");
+        setUploading(false);
+        setProgress(0);
+        setFile(null);
+      }
+    );
   };
 
   return (
-    <div className="flex items-center gap-2 mt-2">
+    <div className="max-w-md p-6 mx-auto bg-white rounded-lg shadow-lg">
+      <h3 className="mb-4 text-xl font-bold text-center text-gray-800">
+        Upload Patient Image/Document
+      </h3>
+
       <input
         type="file"
         onChange={(e) => setFile(e.target.files?.[0] || null)}
-        className="text-sm"
-        disabled={uploading}
+        className="w-full p-3 mb-4 bg-gray-100 border border-gray-300 rounded-lg"
       />
+
       <button
         onClick={handleUpload}
-        disabled={!file || uploading}
-        className="px-3 py-1 bg-[#5c3a21] text-white rounded hover:bg-[#3b2615] disabled:opacity-50 disabled:cursor-not-allowed"
+        disabled={uploading}
+        className="w-full p-3 font-semibold text-white bg-green-600 rounded-full hover:bg-green-700"
       >
-        {uploading ? 'Uploading...' : 'Upload'}
+        {uploading ? `Uploading... ${Math.round(progress)}%` : "Upload"}
       </button>
     </div>
   );

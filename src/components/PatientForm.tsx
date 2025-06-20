@@ -1,11 +1,10 @@
-// src/components/PatientForm.tsx
 import React, { useEffect, useState } from 'react';
 import localforage from 'localforage';
 import { addDoc, collection, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase/firebase-config';
 import { toast } from 'react-hot-toast';
-import { uploadFileForPatient } from '../firebase/storage';
-import { useBusinessId } from '../hooks/useBusinessId';
+import { uploadFileWithMetadata } from '../firebase/storage';
+import { useBusinessContext } from '../contexts/BusinessContext';
 
 interface EmergencyContact {
   name: string;
@@ -45,16 +44,18 @@ const initialState: PatientFormType = {
 };
 
 const PatientForm: React.FC = () => {
-  const businessId = useBusinessId();
+  const { businessId } = useBusinessContext();
   const [form, setForm] = useState<PatientFormType>(initialState);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Retrieve the user's details from local storage
   useEffect(() => {
     localforage.getItem<PatientFormType>('patientForm').then((saved) => {
       if (saved) setForm(saved);
     });
   }, []);
 
+  // Save form data to local storage whenever form changes
   useEffect(() => {
     localforage.setItem('patientForm', form);
   }, [form]);
@@ -92,7 +93,9 @@ const PatientForm: React.FC = () => {
       });
 
       if (file) {
-        await uploadFileForPatient(file, docRef.id, businessId, 'Receptionist');
+        // Pass the uploader name here as the 7th argument (uploaderName)
+        const uploader = "Admin";  // You can dynamically set this based on the user context
+        await uploadFileWithMetadata(file, docRef.id, businessId, 'Receptionist', 'patients', 'Admin', uploader);  // added uploader as the last argument
         toast.success('File uploaded');
       }
 

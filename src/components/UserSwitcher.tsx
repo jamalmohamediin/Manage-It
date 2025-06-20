@@ -1,20 +1,21 @@
-// src/components/UserSwitcher.tsx
+import React from "react";
+import { useRoleContext } from "../contexts/RoleContext";
 
-import React, { useContext } from "react";
-import { UserContext } from "../contexts/UserContext";
+const ROLES = ["Admin", "Doctor", "Receptionist"];
 
 const UserSwitcher: React.FC = () => {
-  const { userId, setUserId, users } = useContext(UserContext);
+  const { role, setRole } = useRoleContext();
 
   return (
     <select
-      value={userId}
-      onChange={(e) => setUserId(e.target.value)}
-      className="p-2 mx-2 border rounded"
+      value={role}
+      onChange={e => setRole(e.target.value)}
+      className="p-2 rounded border bg-brown-50 text-[#3b2615] font-medium"
     >
-      {users.map((u) => (
-        <option key={u.id} value={u.id}>
-          {u.name}
+      <option value="">Select Role</option>
+      {ROLES.map(r => (
+        <option key={r} value={r}>
+          {r}
         </option>
       ))}
     </select>
