@@ -1,21 +1,20 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect } from "react";
 import { Bell } from "lucide-react";
 import NotificationList from "./NotificationList";
-import { UserContext } from "../contexts/UserContext";
 import { getUserNotifications } from "../firebase/notifications";
 import type { Notification } from "../firebase/notifications";
 import localforage from "localforage";
+import { useUserContext } from "../contexts/UserContext";
 
 const LOCAL_KEY_PREFIX = "notifications_cache_";
 
 const NotificationBell: React.FC = () => {
-  const { userId } = useContext(UserContext);
+  const { userId } = useUserContext();
   const [open, setOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Load notifications from cache first (instant/offline display)
   useEffect(() => {
     if (!userId) return;
     const key = LOCAL_KEY_PREFIX + userId;
@@ -28,7 +27,6 @@ const NotificationBell: React.FC = () => {
     });
   }, [userId]);
 
-  // Then fetch from Firestore and update cache
   useEffect(() => {
     if (!userId) return;
     setLoading(true);
@@ -47,9 +45,7 @@ const NotificationBell: React.FC = () => {
         setUnreadCount(mapped.filter((n) => !n.read).length);
         localforage.setItem(key, mapped);
       })
-      .catch(() => {
-        // If Firestore fails (offline), keep local cache
-      })
+      .catch(() => {})
       .finally(() => setLoading(false));
   }, [userId, open]);
 
@@ -75,15 +71,9 @@ const NotificationBell: React.FC = () => {
               notifications={notifications}
               userId={userId}
               onUpdate={(updated) => {
-                // Ensure updated notifications have userId property
-                const updatedWithUserId = updated.map((notification) => ({
-                  ...notification,
-                  userId: userId,
-                }));
+                const updatedWithUserId = updated.map((n) => ({ ...n, userId }));
                 setNotifications(updatedWithUserId);
-                // Update cache instantly for offline consistency
-                const key = LOCAL_KEY_PREFIX + userId;
-                localforage.setItem(key, updatedWithUserId);
+                localforage.setItem(LOCAL_KEY_PREFIX + userId, updatedWithUserId);
                 setUnreadCount(updatedWithUserId.filter((n) => !n.read).length);
               }}
             />

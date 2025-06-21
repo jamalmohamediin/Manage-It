@@ -6,7 +6,6 @@ import { useLanguageContext } from '../contexts/LanguageContext';
 import { getTranslatedIndustries } from '../utils/industryTranslations';
 import { SupportedLanguage } from '../utils/industryTranslations';
 
-// Extended interface to include the new contact properties
 interface ExtendedBusiness extends Business {
   contactEmail?: string;
   socialHandle?: string;
@@ -23,7 +22,6 @@ const PublicLanding = () => {
   useEffect(() => {
     if (businessId) {
       getBusinessById(businessId).then((b) => {
-        // Cast the business object to include the extended properties
         setBusiness(b as ExtendedBusiness);
       });
     }
@@ -53,7 +51,6 @@ const PublicLanding = () => {
 
       {business ? (
         <div className="space-y-6">
-          {/* Banner */}
           {business.bannerURL && (
             <div className="w-full">
               <img
@@ -64,7 +61,6 @@ const PublicLanding = () => {
             </div>
           )}
 
-          {/* Logo */}
           {business.logoURL && (
             <div className="flex justify-center -mt-12">
               <img
@@ -75,13 +71,11 @@ const PublicLanding = () => {
             </div>
           )}
 
-          {/* Name & Industry */}
           <h2 className="text-2xl font-semibold text-center">{business.name}</h2>
           <p className="text-center text-md font-medium italic text-[#5c3a21]">
             {translatedIndustry}
           </p>
 
-          {/* About Section */}
           {business.about && (
             <div>
               <h3 className="mb-2 text-lg font-semibold">Description</h3>
@@ -89,7 +83,6 @@ const PublicLanding = () => {
             </div>
           )}
 
-          {/* Contact Links Section */}
           <div className="space-y-2 text-[#3b2615]/90">
             {business.contactEmail && (
               <p>

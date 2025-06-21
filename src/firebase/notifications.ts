@@ -1,3 +1,4 @@
+// src/firebase/notifications.ts
 import {
   collection,
   addDoc,
@@ -17,13 +18,11 @@ export interface Notification {
   body: string;
   read: boolean;
   createdAt: any;
-  // Optionally add meta info (for expiry, etc)
   metaType?: string;
   role?: string;
   expiryDate?: string;
 }
 
-// Add a notification for a user, with optional meta info
 export async function addNotification({
   userId,
   title,
@@ -43,7 +42,6 @@ export async function addNotification({
   });
 }
 
-// Check if a role-expiry notification already exists for this user/role/date
 export async function checkExistingExpiryNotification(
   userId: string,
   role: string,
@@ -79,7 +77,6 @@ export async function getUserNotifications(userId: string): Promise<Notification
   });
 }
 
-// Mark notification as read
 export async function markAsRead(notifId: string) {
   await updateDoc(doc(db, "notifications", notifId), { read: true });
 }

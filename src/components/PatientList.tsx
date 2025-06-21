@@ -1,9 +1,9 @@
-import React, { useEffect, useState, useContext } from "react";
+import React, { useEffect, useState } from "react";
 import { db } from "../firebase/firebase-config";
 import { collection, onSnapshot } from "firebase/firestore";
 import FileUploaderModal from "./FileUploaderModal";
 import { useBusinessContext } from "../contexts/BusinessContext";
-import { UserContext } from "../contexts/UserContext";
+import { useUserContext } from "../contexts/UserContext";
 
 type Patient = {
   id: string;
@@ -21,8 +21,8 @@ const PatientList = () => {
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
 
   const { businessId } = useBusinessContext();
-  const { userId, users } = useContext(UserContext);
-  const uploaderName = users.find(u => u.id === userId)?.name || "Unknown";
+  const { userId, users } = useUserContext();
+  const uploaderName = users.find((u) => u.id === userId)?.name || "Unknown";
 
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, "patients"), (snapshot) => {
@@ -78,7 +78,6 @@ const PatientList = () => {
         </ul>
       )}
 
-      {/* Modal for file uploads */}
       {modalOpen && selectedPatientId && (
         <FileUploaderModal
           itemId={selectedPatientId}

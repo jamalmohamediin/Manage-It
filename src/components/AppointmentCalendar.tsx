@@ -1,3 +1,4 @@
+// src/components/AppointmentCalendar.tsx
 import React, { useEffect, useState } from "react";
 import Calendar from "react-calendar";
 import "react-calendar/dist/Calendar.css";
@@ -7,11 +8,6 @@ import { Appointment, Patient } from "../types";
 import { getPatients } from "../firebase/patients";
 import localforage from "localforage";
 
-type CalendarTile = {
-  date: Date;
-  view: string;
-};
-
 const LOCAL_KEY_PREFIX = "appointments_cache_";
 
 const AppointmentCalendar: React.FC = () => {
@@ -20,7 +16,6 @@ const AppointmentCalendar: React.FC = () => {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
-  // Load cached appointments
   useEffect(() => {
     if (!businessId) return;
     const key = LOCAL_KEY_PREFIX + businessId;
@@ -29,7 +24,6 @@ const AppointmentCalendar: React.FC = () => {
     });
   }, [businessId]);
 
-  // Load from Firestore & patients
   useEffect(() => {
     if (!businessId) return;
     getAppointments(businessId).then((apps) => {
@@ -40,7 +34,6 @@ const AppointmentCalendar: React.FC = () => {
     getPatients(businessId).then(setPatients);
   }, [businessId]);
 
-  // Show appointments for the selected day
   const selectedDayAppointments = selectedDate
     ? appointments.filter((a) =>
         a.date &&
@@ -48,12 +41,10 @@ const AppointmentCalendar: React.FC = () => {
       )
     : [];
 
-  // Get patient name
   const getPatientName = (id?: string) =>
     patients.find((p) => p.id === id)?.fullName || "Unknown";
 
-  // Highlight days with appointments
-  const tileContent = ({ date, view }: CalendarTile) => {
+  const tileContent = ({ date, view }: { date: Date; view: string }) => {
     if (view !== "month") return null;
     const hasAppointment = appointments.some(
       (a) => a.date && new Date(a.date).toDateString() === date.toDateString()
@@ -112,3 +103,6 @@ const AppointmentCalendar: React.FC = () => {
 };
 
 export default AppointmentCalendar;
+
+// Notification-related code is assumed to be in NotificationBell.tsx, NotificationList.tsx, and firebase/notifications.ts
+// If you'd like me to also post those full code files, let me know!

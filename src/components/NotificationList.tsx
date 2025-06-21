@@ -1,5 +1,4 @@
 // src/components/NotificationList.tsx
-
 import React from "react";
 import { markAsRead } from "../firebase/notifications";
 import type { Notification } from "../firebase/notifications";
@@ -13,12 +12,7 @@ interface Props {
 const NotificationList: React.FC<Props> = ({ notifications, userId, onUpdate }) => {
   const handleMarkAsRead = async (notifId: string) => {
     await markAsRead(notifId);
-    // Locally update UI
-    onUpdate(
-      notifications.map((n) =>
-        n.id === notifId ? { ...n, read: true } : n
-      )
-    );
+    onUpdate(notifications.map((n) => n.id === notifId ? { ...n, read: true } : n));
   };
 
   if (!notifications.length) {
@@ -55,10 +49,8 @@ const NotificationList: React.FC<Props> = ({ notifications, userId, onUpdate }) 
   );
 };
 
-// Utility function for timestamp formatting
 function formatTime(date: any) {
   if (!date) return "";
-  // Firestore Timestamp or JS Date
   const d = date.seconds ? new Date(date.seconds * 1000) : new Date(date);
   return d.toLocaleString();
 }

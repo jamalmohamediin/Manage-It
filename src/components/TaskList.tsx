@@ -1,10 +1,10 @@
-import React, { useEffect, useState, useContext } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Task } from '../types';
 import { getTasks } from '../firebase/tasks';
 import { useBusinessId } from '../hooks/useBusinessId';
 import localforage from 'localforage';
 import FileUploaderModal from './FileUploaderModal';
-import { UserContext } from '../contexts/UserContext';
+import { useUserContext } from '../contexts/UserContext';
 
 const LOCAL_KEY_PREFIX = "tasks_cache_";
 
@@ -15,11 +15,10 @@ const TaskList: React.FC = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
 
-  const { userId, users } = useContext(UserContext);
-  const uploaderName = users.find(u => u.id === userId)?.name || "Unknown";
-  const userRole = users.find(u => u.id === userId)?.role || "guest"; // Get the user's role
+  const { userId, users } = useUserContext();
+  const uploaderName = users.find((u) => u.id === userId)?.name || "Unknown";
+  const userRole = users.find((u) => u.id === userId)?.role || "guest";
 
-  // Load from local cache first
   useEffect(() => {
     if (!businessId) return;
     const key = LOCAL_KEY_PREFIX + businessId;
@@ -31,17 +30,14 @@ const TaskList: React.FC = () => {
     });
   }, [businessId]);
 
-  // Then load from Firestore
   useEffect(() => {
     if (!businessId) return;
     setLoading(true);
     getTasks(businessId)
       .then((data) => {
         setTasks(data);
-        const key = LOCAL_KEY_PREFIX + businessId;
-        localforage.setItem(key, data);
+        localforage.setItem(LOCAL_KEY_PREFIX + businessId, data);
       })
-      .catch(() => {})
       .finally(() => setLoading(false));
   }, [businessId]);
 
@@ -72,7 +68,6 @@ const TaskList: React.FC = () => {
                 <th className="px-4 py-2 border">Status</th>
                 <th className="px-4 py-2 border">Notes</th>
                 <th className="px-4 py-2 border">Files</th>
-                {/* Conditional Column: Admins and Doctors can see the "Actions" button */}
                 {(userRole === 'admin' || userRole === 'doctor') && (
                   <th className="px-4 py-2 border">Actions</th>
                 )}
@@ -95,7 +90,6 @@ const TaskList: React.FC = () => {
                       📎 Upload/View
                     </button>
                   </td>
-                  {/* Show "Actions" button only for Admins and Doctors */}
                   {(userRole === 'admin' || userRole === 'doctor') && (
                     <td className="px-4 py-2 border">
                       <button
@@ -112,7 +106,6 @@ const TaskList: React.FC = () => {
           </table>
         </div>
       )}
-      {/* File Modal */}
       {modalOpen && selectedTaskId && businessId && (
         <FileUploaderModal
           itemId={selectedTaskId}
