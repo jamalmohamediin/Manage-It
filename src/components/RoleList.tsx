@@ -1,3 +1,4 @@
+// src/components/RoleList.tsx
 import React, { useEffect, useState, useContext } from 'react';
 import { fetchAllRoles, removeRoleAssignment, notifyExpiringRoles } from '../firebase/roles';
 import { UserRole } from '../types';
@@ -8,7 +9,7 @@ import localforage from 'localforage';
 import FileUploaderModal from './FileUploaderModal';
 import { UserContext } from '../contexts/UserContext';
 
-const LOCAL_KEY_PREFIX = "roles_cache_"; // Unique per business
+const LOCAL_KEY_PREFIX = "roles_cache_";
 
 const RoleList: React.FC = () => {
   const businessId = useBusinessId();
@@ -20,14 +21,12 @@ const RoleList: React.FC = () => {
   const { userId, users } = useContext(UserContext);
   const uploaderName = users.find(u => u.id === userId)?.name || "Unknown";
 
-  // Trigger expiring role notification check
   useEffect(() => {
     if (businessId) {
       notifyExpiringRoles(businessId);
     }
   }, [businessId]);
 
-  // Load roles from local cache first
   useEffect(() => {
     if (!businessId) return;
     const key = LOCAL_KEY_PREFIX + businessId;
@@ -39,20 +38,15 @@ const RoleList: React.FC = () => {
     });
   }, [businessId]);
 
-  // Then fetch from Firestore and update cache
   useEffect(() => {
     if (!businessId) return;
     setLoading(true);
     fetchAllRoles(businessId)
       .then((data) => {
         setRoles(data);
-        // Save latest to cache
-        const key = LOCAL_KEY_PREFIX + businessId;
-        localforage.setItem(key, data);
+        localforage.setItem(LOCAL_KEY_PREFIX + businessId, data);
       })
-      .catch(() => {
-        // If Firestore fails (offline), keep local cache
-      })
+      .catch(() => {})
       .finally(() => setLoading(false));
   }, [businessId]);
 
@@ -60,25 +54,18 @@ const RoleList: React.FC = () => {
     if (!businessId) return;
     try {
       await removeRoleAssignment(userId, role, businessId);
-      setRoles((prev) => {
-        const updated = prev.filter((r) => !(r.userId === userId && r.role === role));
-        // Update cache after removal
-        const key = LOCAL_KEY_PREFIX + businessId;
-        localforage.setItem(key, updated);
-        return updated;
-      });
+      const updated = roles.filter((r) => !(r.userId === userId && r.role === role));
+      setRoles(updated);
+      localforage.setItem(LOCAL_KEY_PREFIX + businessId, updated);
       toast.success('Role removed');
     } catch (err) {
-      console.error(err);
       toast.error('Failed to remove role');
     }
   };
 
   const isExpiringSoon = (date?: string) => {
     if (!date) return false;
-    const now = dayjs();
-    const expiry = dayjs(date);
-    return expiry.isValid() && expiry.diff(now, 'day') <= 7;
+    return dayjs(date).diff(dayjs(), 'day') <= 7;
   };
 
   const openModal = (roleId: string) => {
@@ -117,14 +104,10 @@ const RoleList: React.FC = () => {
                     <>
                       {dayjs(r.expiresAt).format('YYYY-MM-DD')}
                       {isExpiringSoon(r.expiresAt) && (
-                        <span className="ml-2 text-sm font-semibold text-red-600">
-                          (Expiring Soon!)
-                        </span>
+                        <span className="ml-2 text-sm font-semibold text-red-600">(Expiring Soon!)</span>
                       )}
                     </>
-                  ) : (
-                    '—'
-                  )}
+                  ) : '—'}
                 </td>
                 <td className="px-4 py-2 border">
                   <button
@@ -147,7 +130,7 @@ const RoleList: React.FC = () => {
           </tbody>
         </table>
       )}
-      {/* File Modal */}
+
       {modalOpen && selectedRoleId && businessId && (
         <FileUploaderModal
           itemId={selectedRoleId}

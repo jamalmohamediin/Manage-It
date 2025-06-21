@@ -1,104 +1,42 @@
-// src/components/MainDashboard.tsx
-
-import React, { useEffect, useState } from "react";
-import { useRoleContext } from "../contexts/RoleContext";
-import { useBusinessId } from "../hooks/useBusinessId";
-import { getPatients } from "../firebase/patients";
-import { getAppointments } from "../firebase/appointments";
-import { fetchAllRoles } from "../firebase/roles";
-import dayjs from "dayjs";
+import React from 'react';
+import { useBusinessId } from '../hooks/useBusinessId';
+import { getBusinessById } from '../firebase/businesses';
+import { useNavigate } from 'react-router-dom';
 
 const MainDashboard: React.FC = () => {
-  const { role } = useRoleContext();
   const businessId = useBusinessId();
+  const navigate = useNavigate();
+  const [business, setBusiness] = React.useState<any>(null);
 
-  const [patients, setPatients] = useState<any[]>([]);
-  const [appointments, setAppointments] = useState<any[]>([]);
-  const [roles, setRoles] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
+  React.useEffect(() => {
     if (!businessId) return;
-    setLoading(true);
-
-    // Fetch everything in parallel for speed
-    Promise.all([
-      getPatients(businessId),
-      getAppointments(businessId),
-      fetchAllRoles(businessId),
-    ]).then(([pat, apps, roles]) => {
-      setPatients(pat);
-      setAppointments(apps);
-      setRoles(roles);
-    }).finally(() => setLoading(false));
+    getBusinessById(businessId).then((b) => setBusiness(b));
   }, [businessId]);
 
-  // Helper: Appointments today
-  const todayStr = dayjs().format("YYYY-MM-DD");
-  const todaysAppointments = appointments.filter((a: any) =>
-    a.date && a.date.startsWith(todayStr)
-  );
-
-  // Helper: Expiring roles (within 7 days)
-  const expiringRoles = roles.filter((r: any) =>
-    r.expiresAt && dayjs(r.expiresAt).diff(dayjs(), "day") <= 7
-  );
-
-  if (loading) return (
-    <div className="p-4 text-center text-gray-600">Loading dashboard...</div>
-  );
-
-  // ROLE-BASED DASHBOARDS
-  if (role === "Receptionist") {
-    return (
-      <div className="grid grid-cols-2 gap-4 mb-6 md:grid-cols-4">
-        <StatCard label="Total Patients" value={patients.length} />
-        <StatCard label="Today's Appointments" value={todaysAppointments.length} />
-        <StatCard label="All Appointments" value={appointments.length} />
-        <StatCard label="Your Role" value={role} />
-      </div>
-    );
-  }
-
-  if (role === "Doctor") {
-    // Show only appointments assigned to this doctor (expand if you use userId logic)
-    return (
-      <div className="grid grid-cols-2 gap-4 mb-6 md:grid-cols-4">
-        <StatCard label="Today's Appointments" value={todaysAppointments.length} />
-        <StatCard label="All Appointments" value={appointments.length} />
-        <StatCard label="Total Patients" value={patients.length} />
-        <StatCard label="Your Role" value={role} />
-      </div>
-    );
-  }
-
-  if (role === "Admin") {
-    return (
-      <div className="grid grid-cols-2 gap-4 mb-6 md:grid-cols-4">
-        <StatCard label="Total Patients" value={patients.length} />
-        <StatCard label="Total Appointments" value={appointments.length} />
-        <StatCard label="Expiring Roles" value={expiringRoles.length} />
-        <StatCard label="Your Role" value={role} />
-      </div>
-    );
-  }
-
-  // Fallback for users without a role
   return (
-    <div className="grid grid-cols-2 gap-4 mb-6 md:grid-cols-4">
-      <StatCard label="Total Patients" value={patients.length} />
-      <StatCard label="All Appointments" value={appointments.length} />
-      <StatCard label="Your Role" value={role || "Not Selected"} />
+    <div className="space-y-6">
+      {/* Main Content Area */}
+      <div className="p-6 bg-white rounded shadow">
+        <h2 className="text-xl font-bold">Naim Investments Limited</h2>
+        <p>Your central hub for managing recruitment.</p>
+        <button
+          onClick={() => navigate("/dashboard/patients")}
+          className="px-6 py-2 mt-4 text-white bg-yellow-400 rounded"
+        >
+          Go to Admin Dashboard
+        </button>
+        <div className="mt-4 space-y-4">
+          <h3 className="font-semibold">Tasks Overview</h3>
+          <div className="p-4 bg-gray-100 rounded">
+            <h4 className="text-lg">Prepare onboarding for Bob The Builder</h4>
+            <div className="text-sm text-gray-700">Candidate: Bob The Builder</div>
+            <div className="text-sm text-gray-700">Assigned To: Admin</div>
+            <button className="text-blue-600 hover:underline">In Progress</button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
-
-// Helper Card Component
-const StatCard = ({ label, value }: { label: string; value: any }) => (
-  <div className="p-4 bg-[#eedccb] rounded-lg shadow text-center">
-    <div className="text-sm text-[#3b2615]">{label}</div>
-    <div className="text-2xl font-bold text-[#5c3a21]">{value}</div>
-  </div>
-);
 
 export default MainDashboard;

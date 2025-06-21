@@ -31,7 +31,6 @@ const RoleForm: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!businessId) return toast.error('Select a business first');
-
     if (!userId || !role) return toast.error('User ID and Role are required');
 
     setSubmitting(true);
@@ -74,9 +73,7 @@ const RoleForm: React.FC = () => {
       >
         <option value="">Select Role</option>
         {availableRoles.map((r) => (
-          <option key={r} value={r}>
-            {r}
-          </option>
+          <option key={r} value={r}>{r}</option>
         ))}
       </select>
 
