@@ -1,15 +1,15 @@
 import {
   LucideIcon,
   LayoutDashboard,
-  Stethoscope,
+  Briefcase,
   Users,
   User,
   ClipboardList,
-  Calendar,
+  CalendarClock,
   Settings,
   Building2,
   MonitorDot,
-  CalendarClock,
+  Stethoscope,
 } from 'lucide-react';
 
 export interface NavItem {
@@ -18,13 +18,14 @@ export interface NavItem {
   icon: LucideIcon;
 }
 
+// ✅ MAIN APP NAVIGATION
 export const NAV_ITEMS: NavItem[] = [
-  { path: '/dashboard/patients', label: 'Dashboard', icon: LayoutDashboard },
+  { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { path: '/doctor', label: "Doctor's View", icon: Stethoscope },
   { path: '/patients', label: 'Patients', icon: Users },
   { path: '/receptionist', label: 'Receptionist View', icon: User },
   { path: '/dashboard/profile', label: "Hospital's Dashboard", icon: Building2 },
-  { path: '/dashboard/documents', label: 'Upcoming Cases/Slates', icon: MonitorDot },
+  { path: '/slates', label: 'Upcoming Cases/Slates', icon: MonitorDot }, // ✅ FIXED PATH
   { path: '/tasks', label: 'Tasks', icon: ClipboardList },
   { path: '/appointments', label: 'Appointments', icon: CalendarClock },
   { path: '/settings/business', label: 'Settings', icon: Settings },

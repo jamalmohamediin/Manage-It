@@ -1,150 +1,188 @@
-// src/components/MainDashboard.tsx
-import React, { useState, useEffect } from 'react';
+// src/pages/MainDashboard.tsx
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useBusinessId } from '../hooks/useBusinessId';
-import { getBusinessById } from '../firebase/businesses';
-import { useRoleContext } from '../contexts/RoleContext';
+import { Task, Patient } from '../types';
+import { getTasks, updateTask } from '../firebase/tasks';
 import { getPatients } from '../firebase/patients';
-import { getTasks } from '../firebase/tasks';
-import { getAppointments } from '../firebase/appointments';
+import { toast } from 'react-hot-toast';
+import { useUserContext } from '../contexts/UserContext';
 
 const MainDashboard: React.FC = () => {
   const navigate = useNavigate();
   const businessId = useBusinessId();
-  const { role } = useRoleContext();
-  const [business, setBusiness] = useState<any>(null);
-  const [stats, setStats] = useState({ patients: 0, tasks: 0, appointments: 0 });
-  const [searchTerm, setSearchTerm] = useState('');
+  const { user } = useUserContext();
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [loadingTasks, setLoadingTasks] = useState(true);
+  const [loadingPatients, setLoadingPatients] = useState(true);
+
+  const getGreeting = () => 'Good afternoon, Doctor!';
 
   useEffect(() => {
     if (!businessId) return;
-    getBusinessById(businessId).then(setBusiness);
 
-    const fetchStats = async () => {
-      const [patients, tasks, appointments] = await Promise.all([
-        getPatients(businessId),
-        getTasks(businessId),
-        getAppointments(businessId),
-      ]);
-      setStats({
-        patients: patients.length,
-        tasks: tasks.length,
-        appointments: appointments.length,
-      });
+    const loadTasks = async () => {
+      setLoadingTasks(true);
+      const data = await getTasks(businessId);
+      setTasks(data);
+      setLoadingTasks(false);
     };
 
-    fetchStats();
+    const loadPatients = async () => {
+      setLoadingPatients(true);
+      const data = await getPatients(businessId);
+      setPatients(data.slice(0, 5));
+      setLoadingPatients(false);
+    };
+
+    loadTasks();
+    loadPatients();
   }, [businessId]);
 
-  const StatCard = ({ title, count, color }: { title: string; count: number; color: string }) => (
-    <div className={`flex-1 p-4 rounded-lg shadow bg-${color}-100`}>
-      <h4 className="text-md font-semibold text-[#3b2615]">{title}</h4>
-      <p className="text-2xl font-bold text-[#3b2615]">{count}</p>
-    </div>
-  );
-
-  const renderAdminDashboard = () => (
-    <>
-      <h2 className="mb-2 text-xl font-bold">Welcome Admin</h2>
-      <input
-        type="text"
-        placeholder="Search tasks/patients..."
-        className="w-full p-2 mb-4 border rounded"
-        value={searchTerm}
-        onChange={(e) => setSearchTerm(e.target.value)}
-      />
-      <div className="flex gap-4 mb-6">
-        <StatCard title="Patients" count={stats.patients} color="green" />
-        <StatCard title="Tasks" count={stats.tasks} color="yellow" />
-        <StatCard title="Appointments" count={stats.appointments} color="blue" />
-      </div>
-      <button
-        onClick={() => navigate('/tasks')}
-        className="px-4 py-2 text-white bg-[#3b2615] rounded"
-      >
-        View All Tasks
-      </button>
-    </>
-  );
-
-  const renderDoctorDashboard = () => (
-    <>
-      <h2 className="mb-2 text-xl font-bold">Welcome Doctor</h2>
-      <input
-        type="text"
-        placeholder="Search patients..."
-        className="w-full p-2 mb-4 border rounded"
-        value={searchTerm}
-        onChange={(e) => setSearchTerm(e.target.value)}
-      />
-      <div className="flex gap-4 mb-6">
-        <StatCard title="My Patients" count={stats.patients} color="green" />
-        <StatCard title="Appointments" count={stats.appointments} color="blue" />
-      </div>
-      <button
-        onClick={() => navigate('/appointments/calendar')}
-        className="px-4 py-2 text-white bg-blue-500 rounded"
-      >
-        View Appointment Calendar
-      </button>
-    </>
-  );
-
-  const renderReceptionistDashboard = () => (
-    <>
-      <h2 className="mb-2 text-xl font-bold">Welcome Receptionist</h2>
-      <input
-        type="text"
-        placeholder="Search patients..."
-        className="w-full p-2 mb-4 border rounded"
-        value={searchTerm}
-        onChange={(e) => setSearchTerm(e.target.value)}
-      />
-      <div className="flex gap-4 mb-6">
-        <StatCard title="Registered Patients" count={stats.patients} color="green" />
-        <StatCard title="Upcoming Appointments" count={stats.appointments} color="yellow" />
-      </div>
-      <div className="flex gap-4">
-        <button
-          onClick={() => navigate('/patients')}
-          className="px-4 py-2 text-white bg-green-600 rounded"
-        >
-          Manage Patients
-        </button>
-        <button
-          onClick={() => navigate('/appointments')}
-          className="px-4 py-2 text-white bg-yellow-500 rounded"
-        >
-          Appointments
-        </button>
-      </div>
-    </>
-  );
-
-  const renderDashboardContent = () => {
-    switch (role?.toLowerCase()) {
-      case 'admin':
-        return renderAdminDashboard();
-      case 'doctor':
-        return renderDoctorDashboard();
-      case 'receptionist':
-        return renderReceptionistDashboard();
+  const getStatusStyles = (status: Task['status']) => {
+    switch (status) {
+      case 'pending':
+        return 'bg-gray-200 text-gray-800 border-gray-300';
+      case 'in progress':
+        return 'bg-blue-100 text-blue-800 border-blue-300';
+      case 'done':
+        return 'bg-green-100 text-green-800 border-green-300';
+      case 'cancelled':
+        return 'bg-red-100 text-red-800 border-red-300';
       default:
-        return (
-          <p className="text-red-600">
-            No role selected. Please choose a role from the top dropdown.
-          </p>
-        );
+        return 'bg-gray-100 text-gray-800 border-gray-300';
+    }
+  };
+
+  const getTriageBadge = (status?: string) => {
+    const base = 'px-2 py-1 rounded-full text-xs font-bold';
+    switch ((status || '').toLowerCase()) {
+      case 'critical':
+      case 'red':
+        return <span className={`${base} bg-red-100 text-red-800`}>Critical</span>;
+      case 'yellow':
+      case 'moderate':
+        return <span className={`${base} bg-yellow-100 text-yellow-800`}>Moderate</span>;
+      case 'green':
+      case 'stable':
+        return <span className={`${base} bg-green-100 text-green-800`}>Stable</span>;
+      default:
+        return <span className={`${base} bg-gray-200 text-gray-700`}>{status || '—'}</span>;
+    }
+  };
+
+  const handleStatusChange = async (taskId: string, status: Task['status']) => {
+    if (!businessId) return;
+    try {
+      await updateTask(taskId, { status }, businessId);
+      setTasks((prev) => prev.map((task) => (task.id === taskId ? { ...task, status } : task)));
+      toast.success('Status updated');
+    } catch (err) {
+      toast.error('Failed to update status');
     }
   };
 
   return (
-    <div className="space-y-6">
-      <div className="p-6 bg-white rounded shadow">
-        <h1 className="text-2xl font-bold text-[#3b2615] mb-4">
-          {business?.name || 'Business Name'}
+    <div className="min-h-screen p-6 space-y-10 bg-gray-50">
+      {/* Welcome Card */}
+      <div className="px-6 py-8 bg-white shadow rounded-xl">
+        <h1 className="mb-2 text-2xl font-bold text-brown-700">
+          {getGreeting()}
         </h1>
-        {renderDashboardContent()}
+        <p className="text-sm text-gray-600">Your central hub for managing healthcare operations.</p>
+
+        <div className="flex flex-wrap gap-4 mt-6">
+          <button onClick={() => navigate('/doctor')} className="px-4 py-2 border border-gray-300 rounded-md text-brown-700 bg-gray-50 hover:bg-white">Doctor's View</button>
+          <button onClick={() => navigate('/dashboard/profile')} className="px-4 py-2 border border-gray-300 rounded-md text-brown-700 bg-gray-50 hover:bg-white">Hospital Dashboard</button>
+          <button onClick={() => navigate('/patients')} className="px-4 py-2 border border-gray-300 rounded-md text-brown-700 bg-gray-50 hover:bg-white">Search Patients</button>
+          <button onClick={() => navigate('/patients')} className="px-4 py-2 border border-gray-300 rounded-md text-brown-700 bg-gray-50 hover:bg-white">Add Patients</button>
+          <button onClick={() => navigate('/slates')} className="px-4 py-2 border border-gray-300 rounded-md text-brown-700 bg-gray-50 hover:bg-white">Upcoming Cases/Slates</button>
+        </div>
+      </div>
+
+      {/* Upcoming Cases */}
+      <div className="px-6 py-8 bg-white shadow rounded-xl">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-bold text-brown-700">🗂️ Upcoming Cases/Slates</h2>
+          <button onClick={() => navigate('/slates')} className="text-sm underline text-brown-700 hover:text-yellow-600">
+            View All →
+          </button>
+        </div>
+        {loadingPatients ? (
+          <p>Loading cases...</p>
+        ) : patients.length === 0 ? (
+          <p className="italic text-gray-500">No upcoming cases found.</p>
+        ) : (
+          <ul className="space-y-3">
+            {patients.map((p) => (
+              <li key={p.id} className="flex items-center justify-between px-4 py-2 text-sm bg-white border border-gray-300 rounded shadow-sm">
+                <div>
+                  <strong>{p.fullName}</strong> — Age: {p.age}, Gender: {p.gender}, Ward: {p.ward || '—'}
+                </div>
+                <div className="ml-4">
+                  {getTriageBadge(p.triageStatus)}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {/* Tasks */}
+      <div className="px-6 py-8 bg-white shadow rounded-xl">
+        <h2 className="mb-2 text-xl font-bold text-brown-700">📋 Tasks Overview</h2>
+        <p className="mb-4 text-sm text-gray-600">
+          Summary of tasks assigned to you. Status can be changed directly.
+        </p>
+
+        {loadingTasks ? (
+          <p>Loading tasks...</p>
+        ) : tasks.length === 0 ? (
+          <p className="text-sm italic text-gray-500">No tasks available</p>
+        ) : (
+          <div className="space-y-4">
+            {tasks.map((task) => (
+              <div
+                key={task.id}
+                className="flex items-start justify-between p-4 bg-white border border-gray-300 rounded shadow-sm"
+              >
+                <div className="flex-1">
+                  <p className="font-semibold text-gray-800">{task.title}</p>
+                  {task.assignedTo && (
+                    <p className="text-sm text-gray-600">Assigned To: {task.assignedTo}</p>
+                  )}
+                  {task.notes && (
+                    <p className="text-sm italic text-gray-500">Note: {task.notes}</p>
+                  )}
+                </div>
+
+                <div className="flex-shrink-0 ml-4">
+                  <select
+                    value={task.status}
+                    onChange={(e) =>
+                      handleStatusChange(task.id!, e.target.value as Task['status'])
+                    }
+                    className={`px-4 py-2 rounded-full text-sm font-semibold border border-gray-300 cursor-pointer appearance-none min-w-[120px] text-center ${getStatusStyles(task.status)} focus:ring-2 focus:ring-blue-500 focus:outline-none`}
+                    style={{
+                      backgroundImage:
+                        "url(\"data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e\")",
+                      backgroundPosition: 'right 8px center',
+                      backgroundRepeat: 'no-repeat',
+                      backgroundSize: '16px',
+                      paddingRight: '32px',
+                    }}
+                  >
+                    <option value="pending">Pending</option>
+                    <option value="in progress">In Progress</option>
+                    <option value="done">Done</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

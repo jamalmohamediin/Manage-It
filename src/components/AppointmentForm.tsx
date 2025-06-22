@@ -19,13 +19,11 @@ const AppointmentForm: React.FC = () => {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Load patients
   useEffect(() => {
     if (!businessId) return;
     getPatients(businessId).then(setPatients);
   }, [businessId]);
 
-  // Load form state from local cache
   useEffect(() => {
     localforage.getItem<Omit<Appointment, 'id'>>(LOCAL_KEY).then((cached) => {
       if (cached) setForm({ ...cached, businessId });
@@ -61,14 +59,15 @@ const AppointmentForm: React.FC = () => {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="max-w-lg p-6 mx-auto space-y-4 bg-white rounded shadow">
-      <h2 className="text-xl font-bold text-[#3b2615]">Book Appointment</h2>
+    <form onSubmit={handleSubmit} className="max-w-xl p-6 mx-auto space-y-4 bg-white rounded-xl shadow-md text-[#3b2615]">
+      <h2 className="text-2xl font-bold text-brown-700">📅 Book Appointment</h2>
+
       <div>
-        <label className="block mb-1">Patient</label>
+        <label className="block mb-1 font-semibold">Patient</label>
         <select
           value={form.patientId}
           onChange={e => handleInput('patientId', e.target.value)}
-          className="w-full p-2 border rounded"
+          className="w-full p-2 border rounded border-brown-300 focus:ring focus:ring-yellow-200"
           required
         >
           <option value="">Select Patient</option>
@@ -79,31 +78,34 @@ const AppointmentForm: React.FC = () => {
           ))}
         </select>
       </div>
+
       <div>
-        <label className="block mb-1">Date & Time</label>
+        <label className="block mb-1 font-semibold">Date & Time</label>
         <input
           type="datetime-local"
           value={form.date}
           onChange={e => handleInput('date', e.target.value)}
-          className="w-full p-2 border rounded"
+          className="w-full p-2 border rounded border-brown-300 focus:ring focus:ring-yellow-200"
           required
         />
       </div>
+
       <div>
-        <label className="block mb-1">Reason</label>
+        <label className="block mb-1 font-semibold">Reason</label>
         <input
           type="text"
           value={form.reason}
           onChange={e => handleInput('reason', e.target.value)}
-          className="w-full p-2 border rounded"
+          className="w-full p-2 border rounded border-brown-300 focus:ring focus:ring-yellow-200"
           placeholder="Consultation, Check-up, etc."
           required
         />
       </div>
+
       <button
         type="submit"
         disabled={isSubmitting}
-        className="w-full p-3 font-semibold text-white transition rounded-lg bg-brown-800 hover:bg-brown-900 disabled:opacity-60"
+        className="w-full py-3 font-semibold text-white rounded-lg bg-brown-700 hover:bg-brown-800 disabled:opacity-50"
       >
         {isSubmitting ? "Booking..." : "Book Appointment"}
       </button>

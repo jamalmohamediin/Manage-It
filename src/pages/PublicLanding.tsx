@@ -1,4 +1,3 @@
-// src/pages/PublicLanding.tsx
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { getBusinessById, Business } from '../firebase/businesses';
@@ -33,14 +32,16 @@ const PublicLanding = () => {
   return (
     <div className="max-w-3xl mx-auto mt-8 p-6 space-y-6 shadow-xl rounded-2xl bg-white/70 backdrop-blur text-[#3b2615]">
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-3xl font-bold">About this Business</h1>
+        <h1 className="text-3xl font-bold text-brown-700">About this Business</h1>
         <div className="flex gap-2">
           {['en', 'xh', 'zu', 'af', 'sw'].map((lang) => (
             <button
               key={lang}
               onClick={() => setLanguage(lang as SupportedLanguage)}
-              className={`px-3 py-1 rounded-full border text-sm ${
-                language === lang ? 'bg-[#5c3a21] text-white' : 'bg-white text-[#5c3a21]'
+              className={`px-3 py-1 rounded-full border text-sm font-semibold transition ${
+                language === lang
+                  ? 'bg-[#5c3a21] text-white'
+                  : 'bg-white text-[#5c3a21] hover:bg-cream-100'
               }`}
             >
               {lang.toUpperCase()}
@@ -71,14 +72,14 @@ const PublicLanding = () => {
             </div>
           )}
 
-          <h2 className="text-2xl font-semibold text-center">{business.name}</h2>
+          <h2 className="text-2xl font-semibold text-center text-brown-700">{business.name}</h2>
           <p className="text-center text-md font-medium italic text-[#5c3a21]">
             {translatedIndustry}
           </p>
 
           {business.about && (
             <div>
-              <h3 className="mb-2 text-lg font-semibold">Description</h3>
+              <h3 className="mb-2 text-lg font-semibold text-brown-700">Description</h3>
               <p className="text-[#3b2615]/80">{business.about}</p>
             </div>
           )}
@@ -124,7 +125,7 @@ const PublicLanding = () => {
           </div>
         </div>
       ) : (
-        <p className="italic text-center">Loading business information...</p>
+        <p className="italic text-center text-muted">Loading business information...</p>
       )}
     </div>
   );

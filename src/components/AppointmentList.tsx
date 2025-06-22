@@ -1,4 +1,3 @@
-// src/components/AppointmentList.tsx
 import React, { useEffect, useState } from 'react';
 import { getAppointments, deleteAppointment, updateAppointment } from '../firebase/appointments';
 import { getPatients } from '../firebase/patients';
@@ -7,8 +6,6 @@ import { useBusinessId } from '../hooks/useBusinessId';
 import localforage from 'localforage';
 import { Appointment, Patient, UserRole } from '../types';
 import { toast } from 'react-hot-toast';
-
-const LOCAL_KEY_PREFIX = "appointments_cache_";
 
 const AppointmentList: React.FC = () => {
   const businessId = useBusinessId();
@@ -19,17 +16,14 @@ const AppointmentList: React.FC = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<Appointment>>({});
 
-  // Load from cache
   useEffect(() => {
     if (!businessId) return;
-    const key = LOCAL_KEY_PREFIX + businessId;
-    localforage.getItem<Appointment[]>(key).then((cached) => {
+    localforage.getItem<Appointment[]>(`appointments_cache_${businessId}`).then((cached) => {
       if (cached && Array.isArray(cached)) setAppointments(cached);
       setLoading(false);
     });
   }, [businessId]);
 
-  // Fetch from Firestore and update cache
   useEffect(() => {
     if (!businessId) return;
     setLoading(true);
@@ -41,74 +35,60 @@ const AppointmentList: React.FC = () => {
     .then(([apps, pats, roles]) => {
       setAppointments(apps);
       setPatients(pats);
-      setDoctors((roles as UserRole[]).filter((r: UserRole) => r.role.toLowerCase() === "doctor"));
-      const key = LOCAL_KEY_PREFIX + businessId;
-      localforage.setItem(key, apps);
+      setDoctors(roles.filter(r => r.role?.toLowerCase() === "doctor"));
+      localforage.setItem(`appointments_cache_${businessId}`, apps);
     })
-    .catch(() => {})
     .finally(() => setLoading(false));
   }, [businessId]);
 
-  // Get display name
-  const getPatientName = (id?: string) =>
-    patients.find((p: Patient) => p.id === id)?.fullName || "Unknown";
-  const getDoctorName = (id?: string) =>
-    doctors.find((d: UserRole) => d.userId === id)?.userId || "Unassigned";
+  const getPatientName = (id?: string) => patients.find(p => p.id === id)?.fullName || "Unknown";
+  const getDoctorName = (id?: string) => doctors.find(d => d.userId === id)?.userId || "Unassigned";
 
-  // Edit handlers
   const startEdit = (app: Appointment) => {
     setEditingId(app.id!);
-    setEditForm({
-      date: app.date,
-      reason: app.reason,
-      doctorId: app.doctorId || "",
-    });
+    setEditForm({ date: app.date, reason: app.reason, doctorId: app.doctorId || "" });
   };
-  const cancelEdit = () => {
-    setEditingId(null);
-    setEditForm({});
-  };
+
+  const cancelEdit = () => { setEditingId(null); setEditForm({}); };
+
   const saveEdit = async (id: string) => {
     await updateAppointment(id, editForm);
     toast.success("Appointment updated");
-    setEditingId(null);
-    setEditForm({});
-    // Refresh list
-    if (businessId) setLoading(true);
-    getAppointments(businessId!).then((apps: Appointment[]) => setAppointments(apps)).finally(() => setLoading(false));
+    cancelEdit();
+    if (businessId) {
+      setLoading(true);
+      getAppointments(businessId).then(setAppointments).finally(() => setLoading(false));
+    }
   };
 
-  // Delete handler
   const handleDelete = async (id: string) => {
     if (window.confirm("Cancel this appointment?")) {
       await deleteAppointment(id);
       toast.success("Appointment cancelled");
-      setAppointments((apps: Appointment[]) => apps.filter((a: Appointment) => a.id !== id));
+      setAppointments(apps => apps.filter(a => a.id !== id));
     }
   };
 
   return (
-    <div className="max-w-2xl p-6 mx-auto bg-white rounded shadow">
-      <h2 className="text-xl font-bold text-[#3b2615] mb-4">Appointments</h2>
-      {loading ? (
-        <p>Loading...</p>
-      ) : appointments.length === 0 ? (
-        <p>No appointments found.</p>
+    <div className="p-6 space-y-6 bg-white shadow rounded-xl">
+      <h2 className="text-2xl font-bold text-brown-700">🗓️ Appointments</h2>
+      {loading ? <p className="italic text-gray-500">Loading appointments...</p> : appointments.length === 0 ? (
+        <p className="italic text-gray-500">No appointments found.</p>
       ) : (
-        <table className="min-w-full border-collapse table-auto">
-          <thead>
-            <tr className="bg-[#f5f5f5] text-[#3b2615]">
-              <th className="px-4 py-2 border">Date</th>
-              <th className="px-4 py-2 border">Patient</th>
-              <th className="px-4 py-2 border">Reason</th>
-              <th className="px-4 py-2 border">Doctor</th>
-              <th className="px-4 py-2 border">Actions</th>
+        <table className="w-full text-sm border table-auto border-brown-200 rounded-xl">
+          <thead className="text-brown-700 bg-gray-50">
+            <tr>
+              <th className="p-2 border">Date</th>
+              <th className="p-2 border">Patient</th>
+              <th className="p-2 border">Reason</th>
+              <th className="p-2 border">Doctor</th>
+              <th className="p-2 border">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {appointments.map((a: Appointment) => (
-              <tr key={a.id} className="hover:bg-[#f9f9f9]">
-                <td className="px-4 py-2 border">
+            {appointments.map((a) => (
+              <tr key={a.id} className="hover:bg-yellow-50">
+                <td className="p-2 border">
                   {editingId === a.id ? (
                     <input
                       type="datetime-local"
@@ -118,8 +98,8 @@ const AppointmentList: React.FC = () => {
                     />
                   ) : a.date ? new Date(a.date).toLocaleString() : "-"}
                 </td>
-                <td className="px-4 py-2 border">{getPatientName(a.patientId)}</td>
-                <td className="px-4 py-2 border">
+                <td className="p-2 border">{getPatientName(a.patientId)}</td>
+                <td className="p-2 border">
                   {editingId === a.id ? (
                     <input
                       type="text"
@@ -129,7 +109,7 @@ const AppointmentList: React.FC = () => {
                     />
                   ) : a.reason}
                 </td>
-                <td className="px-4 py-2 border">
+                <td className="p-2 border">
                   {editingId === a.id ? (
                     <select
                       value={editForm.doctorId || ""}
@@ -137,26 +117,19 @@ const AppointmentList: React.FC = () => {
                       className="p-1 border rounded"
                     >
                       <option value="">Unassigned</option>
-                      {doctors.map((d: UserRole) => (
-                        <option key={d.userId} value={d.userId}>{d.userId}</option>
-                      ))}
+                      {doctors.map(d => <option key={d.userId} value={d.userId}>{d.userId}</option>)}
                     </select>
                   ) : getDoctorName(a.doctorId)}
                 </td>
-                <td className="px-4 py-2 border">
+                <td className="p-2 space-x-2 border">
                   {editingId === a.id ? (
                     <>
-                      <button
-                        onClick={() => saveEdit(a.id!)}
-                        className="mr-2 text-green-700 hover:underline"
-                      >
-                        Save
-                      </button>
+                      <button onClick={() => saveEdit(a.id!)} className="text-green-700 hover:underline">Save</button>
                       <button onClick={cancelEdit} className="text-gray-500 hover:underline">Cancel</button>
                     </>
                   ) : (
                     <>
-                      <button onClick={() => startEdit(a)} className="mr-2 text-blue-700 hover:underline">Edit</button>
+                      <button onClick={() => startEdit(a)} className="text-blue-700 hover:underline">Edit</button>
                       <button onClick={() => handleDelete(a.id!)} className="text-red-700 hover:underline">Delete</button>
                     </>
                   )}

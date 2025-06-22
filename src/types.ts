@@ -1,5 +1,3 @@
-// src/types.ts
-
 export interface Task {
   id?: string;
   title: string;
@@ -7,8 +5,10 @@ export interface Task {
   assignedTo?: string;
   dueDate?: string;
   businessId: string;
-  status: 'pending' | 'in progress' | 'done'; // New status field
-  notes: string; // New notes field
+  status: 'pending' | 'in progress' | 'done' | 'cancelled';
+  notes: string;
+  createdAt?: Date | string;
+  updatedAt?: Date | string;
 }
 
 export interface Patient {
@@ -20,6 +20,10 @@ export interface Patient {
   age: string;
   address: string;
   businessId: string;
+  medicalAidName?: string;           // ✅ NEW
+  ward?: string;                     // ✅ NEW
+  triageStatus?: string;             // ✅ NEW
+  specialInstructions?: string;      // ✅ NEW
 }
 
 export interface UserRole {

@@ -18,13 +18,14 @@ const RoleList: React.FC = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
 
-  const { userId, users } = useContext(UserContext);
-  const uploaderName = users.find(u => u.id === userId)?.name || "Unknown";
+  const userContext = useContext(UserContext);
+  const userId = userContext?.userId ?? '';
+  const users = userContext?.users ?? [];
+
+  const uploaderName = users.find((u) => u.id === userId)?.name || "Unknown";
 
   useEffect(() => {
-    if (businessId) {
-      notifyExpiringRoles(businessId);
-    }
+    if (businessId) notifyExpiringRoles(businessId);
   }, [businessId]);
 
   useEffect(() => {
@@ -46,7 +47,6 @@ const RoleList: React.FC = () => {
         setRoles(data);
         localforage.setItem(LOCAL_KEY_PREFIX + businessId, data);
       })
-      .catch(() => {})
       .finally(() => setLoading(false));
   }, [businessId]);
 
@@ -58,7 +58,7 @@ const RoleList: React.FC = () => {
       setRoles(updated);
       localforage.setItem(LOCAL_KEY_PREFIX + businessId, updated);
       toast.success('Role removed');
-    } catch (err) {
+    } catch {
       toast.error('Failed to remove role');
     }
   };
@@ -80,13 +80,13 @@ const RoleList: React.FC = () => {
 
   return (
     <div className="p-4 bg-white rounded shadow">
-      <h2 className="text-xl font-bold text-[#3b2615]">User Roles</h2>
+      <h2 className="text-xl font-bold text-brown-700">User Roles</h2>
       {loading ? (
         <p>Loading...</p>
       ) : (
         <table className="min-w-full mt-4 border-collapse table-auto">
           <thead>
-            <tr className="bg-[#f5f5f5] text-[#3b2615]">
+            <tr className="text-brown-700 bg-gray-50">
               <th className="px-4 py-2 border">User ID</th>
               <th className="px-4 py-2 border">Role</th>
               <th className="px-4 py-2 border">Expires At</th>
@@ -96,7 +96,7 @@ const RoleList: React.FC = () => {
           </thead>
           <tbody>
             {roles.map((r) => (
-              <tr key={`${r.userId}-${r.role}`} className="hover:bg-[#f9f9f9]">
+              <tr key={`${r.userId}-${r.role}`} className="hover:bg-gray-100">
                 <td className="px-4 py-2 border">{r.userId}</td>
                 <td className="px-4 py-2 border">{r.role}</td>
                 <td className="px-4 py-2 border">
@@ -111,7 +111,7 @@ const RoleList: React.FC = () => {
                 </td>
                 <td className="px-4 py-2 border">
                   <button
-                    className="px-2 py-1 text-xs rounded bg-brown-200 hover:bg-brown-300"
+                    className="px-2 py-1 text-xs text-yellow-800 bg-yellow-100 rounded hover:bg-yellow-200"
                     onClick={() => openModal(r.id!)}
                   >
                     📎 Upload/View
@@ -120,7 +120,7 @@ const RoleList: React.FC = () => {
                 <td className="px-4 py-2 border">
                   <button
                     onClick={() => handleRemove(r.userId, r.role)}
-                    className="text-red-500 hover:underline"
+                    className="text-red-600 hover:underline"
                   >
                     Remove
                   </button>
@@ -130,7 +130,6 @@ const RoleList: React.FC = () => {
           </tbody>
         </table>
       )}
-
       {modalOpen && selectedRoleId && businessId && (
         <FileUploaderModal
           itemId={selectedRoleId}

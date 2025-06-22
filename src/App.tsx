@@ -22,7 +22,9 @@ import BusinessProfile from './pages/BusinessProfile';
 import PublicLanding from './pages/PublicLanding';
 import ClientView from './pages/ClientView';
 import NotificationList from './components/NotificationList';
-import DoctorView from './pages/DoctorView'; // ✅ NEW IMPORT
+import DoctorView from './pages/DoctorView';
+import HospitalDashboard from './pages/HospitalDashboard';
+import UpcomingSlates from './pages/UpcomingSlates';
 
 import { BusinessProvider } from './contexts/BusinessContext';
 import { UserProvider } from './contexts/UserContext';
@@ -39,7 +41,7 @@ const App: React.FC = () => {
         <RoleProvider>
           <LanguageProvider>
             <Router>
-              <div className="relative min-h-screen bg-[#fffaf5] flex">
+              <div className="relative flex min-h-screen bg-gray-50">
                 <Sidebar
                   isVisible={isSidebarVisible}
                   onHideSidebar={() => setSidebarVisible(false)}
@@ -52,10 +54,11 @@ const App: React.FC = () => {
                   <HeaderBar onToggleSidebar={toggleSidebar} />
                   <div className="px-4 pb-10 mt-4 space-y-6 md:px-6">
                     <BusinessSelector />
-
                     <Routes>
                       <Route path="/" element={<MainDashboard />} />
-                      <Route path="/doctor" element={<DoctorView />} /> {/* ✅ NEW ROUTE */}
+                      <Route path="/dashboard" element={<MainDashboard />} />
+                      <Route path="/doctor" element={<DoctorView />} />
+                      <Route path="/hospital" element={<HospitalDashboard />} />
                       <Route path="/patients" element={<PatientList />} />
                       <Route path="/tasks/new" element={<TaskForm />} />
                       <Route path="/tasks" element={<TaskList />} />
@@ -70,12 +73,8 @@ const App: React.FC = () => {
                       <Route path="/settings/business" element={<BusinessSettings />} />
                       <Route path="/industries" element={<PublicLanding />} />
                       <Route path="/client" element={<ClientView />} />
-                      <Route
-                        path="/notifications"
-                        element={
-                          <NotificationList notifications={[]} userId="" onUpdate={() => {}} />
-                        }
-                      />
+                      <Route path="/notifications" element={<NotificationList notifications={[]} userId="" onUpdate={() => {}} />} />
+                      <Route path="/slates" element={<UpcomingSlates />} />
                     </Routes>
                   </div>
                 </div>
