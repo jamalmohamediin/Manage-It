@@ -2,7 +2,9 @@
 import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 
-// Forms & Lists
+import Sidebar from './components/Sidebar';
+import HeaderBar from './components/HeaderBar';
+import BusinessSelector from './components/BusinessSelector';
 import PatientForm from './components/PatientForm';
 import PatientList from './components/PatientList';
 import TaskForm from './components/TaskForm';
@@ -15,23 +17,13 @@ import RoleList from './components/RoleList';
 import Documents from './components/Documents';
 import PatientDashboard from './components/PatientDashboard';
 import MainDashboard from './components/MainDashboard';
-
-// Layout
-import Sidebar from './components/Sidebar';
-import HeaderBar from './components/HeaderBar';
-import BusinessSelector from './components/BusinessSelector';
-
-// Notifications
-import NotificationList from './components/NotificationList';
-import NotificationBell from './components/NotificationBell';
-
-// Pages
 import BusinessSettings from './components/BusinessSettings';
 import BusinessProfile from './pages/BusinessProfile';
 import PublicLanding from './pages/PublicLanding';
 import ClientView from './pages/ClientView';
+import NotificationList from './components/NotificationList';
+import DoctorView from './pages/DoctorView'; // ✅ NEW IMPORT
 
-// Contexts
 import { BusinessProvider } from './contexts/BusinessContext';
 import { UserProvider } from './contexts/UserContext';
 import { RoleProvider } from './contexts/RoleContext';
@@ -48,17 +40,22 @@ const App: React.FC = () => {
           <LanguageProvider>
             <Router>
               <div className="relative min-h-screen bg-[#fffaf5] flex">
-                {isSidebarVisible && <Sidebar />}
-                <div className={`flex-1 ${isSidebarVisible ? 'ml-64' : 'ml-0'} transition-all`}>
+                <Sidebar
+                  isVisible={isSidebarVisible}
+                  onHideSidebar={() => setSidebarVisible(false)}
+                />
+                <div
+                  className={`transition-all duration-300 flex-1 ${
+                    isSidebarVisible ? 'ml-64' : 'ml-16'
+                  }`}
+                >
                   <HeaderBar onToggleSidebar={toggleSidebar} />
-                  <div className="px-6 pb-10 mt-4 space-y-6">
+                  <div className="px-4 pb-10 mt-4 space-y-6 md:px-6">
                     <BusinessSelector />
 
                     <Routes>
-                      {/* Main Dashboard */}
                       <Route path="/" element={<MainDashboard />} />
-
-                      {/* Core Features */}
+                      <Route path="/doctor" element={<DoctorView />} /> {/* ✅ NEW ROUTE */}
                       <Route path="/patients" element={<PatientList />} />
                       <Route path="/tasks/new" element={<TaskForm />} />
                       <Route path="/tasks" element={<TaskList />} />
@@ -68,27 +65,15 @@ const App: React.FC = () => {
                       <Route path="/dashboard/patients" element={<PatientDashboard />} />
                       <Route path="/dashboard/documents" element={<Documents />} />
                       <Route path="/dashboard/profile" element={<BusinessProfile />} />
-
-                      {/* Role Management */}
                       <Route path="/roles" element={<RoleForm />} />
                       <Route path="/roles/list" element={<RoleList />} />
-
-                      {/* Settings & Landing */}
                       <Route path="/settings/business" element={<BusinessSettings />} />
                       <Route path="/industries" element={<PublicLanding />} />
-
-                      {/* Public View */}
                       <Route path="/client" element={<ClientView />} />
-
-                      {/* Notifications Page */}
                       <Route
                         path="/notifications"
                         element={
-                          <NotificationList
-                            notifications={[]}
-                            userId=""
-                            onUpdate={() => {}}
-                          />
+                          <NotificationList notifications={[]} userId="" onUpdate={() => {}} />
                         }
                       />
                     </Routes>
