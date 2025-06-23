@@ -1,4 +1,3 @@
-// src/App.tsx
 import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 
@@ -73,7 +72,10 @@ const App: React.FC = () => {
                       <Route path="/settings/business" element={<BusinessSettings />} />
                       <Route path="/industries" element={<PublicLanding />} />
                       <Route path="/client" element={<ClientView />} />
-                      <Route path="/notifications" element={<NotificationList notifications={[]} userId="" onUpdate={() => {}} />} />
+                      <Route
+                        path="/notifications"
+                        element={<NotificationList notifications={[]} userId="" onUpdate={() => {}} />}
+                      />
                       <Route path="/slates" element={<UpcomingSlates />} />
                     </Routes>
                   </div>

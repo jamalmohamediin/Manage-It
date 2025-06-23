@@ -2,15 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { getBusinessById, Business } from '../firebase/businesses';
 import { useLanguageContext } from '../contexts/LanguageContext';
-import { getTranslatedIndustries } from '../utils/industryTranslations';
-import { SupportedLanguage } from '../utils/industryTranslations';
+import { getTranslatedIndustries, SupportedLanguage } from '../utils/industryTranslations';
 
 interface ExtendedBusiness extends Business {
   contactEmail?: string;
   socialHandle?: string;
 }
 
-const PublicLanding = () => {
+const PublicLanding: React.FC = () => {
   const [searchParams] = useSearchParams();
   const businessId = searchParams.get('id');
   const [business, setBusiness] = useState<ExtendedBusiness | null>(null);
@@ -20,28 +19,28 @@ const PublicLanding = () => {
 
   useEffect(() => {
     if (businessId) {
-      getBusinessById(businessId).then((b) => {
-        setBusiness(b as ExtendedBusiness);
-      });
+      getBusinessById(businessId).then(b => setBusiness(b as ExtendedBusiness));
     }
   }, [businessId]);
 
   const translatedIndustry =
-    translatedIndustries.find((opt) => opt.value === business?.industry)?.label || 'Unknown';
+    translatedIndustries.find(opt => opt.value === business?.industry)?.label ||
+    'Unknown';
 
   return (
-    <div className="max-w-3xl mx-auto mt-8 p-6 space-y-6 shadow-xl rounded-2xl bg-white/70 backdrop-blur text-[#3b2615]">
+    <div className="max-w-3xl mx-auto mt-8 p-6 space-y-6 bg-white/70 backdrop-blur rounded-2xl shadow-xl text-[#3b2615]">
+      {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-3xl font-bold text-brown-700">About this Business</h1>
         <div className="flex gap-2">
-          {['en', 'xh', 'zu', 'af', 'sw'].map((lang) => (
+          {['en', 'xh', 'zu', 'af', 'sw'].map(lang => (
             <button
               key={lang}
               onClick={() => setLanguage(lang as SupportedLanguage)}
               className={`px-3 py-1 rounded-full border text-sm font-semibold transition ${
                 language === lang
-                  ? 'bg-[#5c3a21] text-white'
-                  : 'bg-white text-[#5c3a21] hover:bg-cream-100'
+                  ? 'bg-brown-700 text-white'
+                  : 'bg-gray-50 text-brown-700 hover:bg-cream-100'
               }`}
             >
               {lang.toUpperCase()}
@@ -50,8 +49,10 @@ const PublicLanding = () => {
         </div>
       </div>
 
+      {/* Content */}
       {business ? (
         <div className="space-y-6">
+          {/* Banner */}
           {business.bannerURL && (
             <div className="w-full">
               <img
@@ -62,6 +63,7 @@ const PublicLanding = () => {
             </div>
           )}
 
+          {/* Logo */}
           {business.logoURL && (
             <div className="flex justify-center -mt-12">
               <img
@@ -72,11 +74,15 @@ const PublicLanding = () => {
             </div>
           )}
 
-          <h2 className="text-2xl font-semibold text-center text-brown-700">{business.name}</h2>
-          <p className="text-center text-md font-medium italic text-[#5c3a21]">
+          {/* Name & Industry */}
+          <h2 className="text-2xl font-semibold text-center text-brown-700">
+            {business.name}
+          </h2>
+          <p className="text-center italic font-medium text-[#5c3a21]">
             {translatedIndustry}
           </p>
 
+          {/* Description */}
           {business.about && (
             <div>
               <h3 className="mb-2 text-lg font-semibold text-brown-700">Description</h3>
@@ -84,6 +90,7 @@ const PublicLanding = () => {
             </div>
           )}
 
+          {/* Contact Info */}
           <div className="space-y-2 text-[#3b2615]/90">
             {business.contactEmail && (
               <p>
@@ -125,7 +132,9 @@ const PublicLanding = () => {
           </div>
         </div>
       ) : (
-        <p className="italic text-center text-muted">Loading business information...</p>
+        <p className="italic text-center text-gray-500">
+          Loading business information...
+        </p>
       )}
     </div>
   );

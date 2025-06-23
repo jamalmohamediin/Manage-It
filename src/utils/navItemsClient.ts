@@ -1,3 +1,4 @@
+// src/utils/navItems_client.ts
 import {
   LucideIcon,
   LayoutDashboard,
@@ -5,11 +6,10 @@ import {
   Users,
   User,
   ClipboardList,
-  Calendar,
+  CalendarClock,
   Settings,
   Building,
   ListTodo,
-  CalendarClock,
 } from 'lucide-react';
 
 export interface NavItem {
@@ -18,15 +18,15 @@ export interface NavItem {
   icon: LucideIcon;
 }
 
-// ✅ Business/Client version — NOT used in current app, only for future variant
+// Business/Client version, relabeled with “Business Hub”
 export const NAV_ITEMS_CLIENT: NavItem[] = [
-  { path: '/dashboard/patients', label: 'Dashboard', icon: LayoutDashboard },
-  { path: '/doctor', label: "Business Owner's View", icon: Briefcase },
-  { path: '/patients', label: 'Clients', icon: Users },
-  { path: '/receptionist', label: 'Receptionist View', icon: User },
-  { path: '/dashboard/profile', label: "Associate's View", icon: Building },
-  { path: '/dashboard/documents', label: 'Upcoming Events', icon: ListTodo },
-  { path: '/tasks', label: 'Tasks', icon: ClipboardList },
-  { path: '/appointments', label: 'Appointments', icon: CalendarClock },
-  { path: '/settings/business', label: 'Settings', icon: Settings },
+  { path: '/doctor',                label: "Business Owner's View",   icon: Briefcase      },
+  { path: '/patients',              label: 'Clients',                 icon: Users          },
+  { path: '/receptionist',          label: 'Receptionist View',      icon: User           },
+  { path: '/dashboard/profile',     label: "Associate's View",        icon: Building       },
+  { path: '/slates',                label: 'Upcoming Events',         icon: ListTodo       },
+  { path: '/tasks',                 label: 'Tasks',                   icon: ClipboardList },
+  { path: '/appointments',          label: 'Appointments',            icon: CalendarClock },
+  { path: '/dashboard/patients',    label: 'Business Hub',            icon: LayoutDashboard },
+  { path: '/settings/business',     label: 'Settings',                icon: Settings       },
 ];

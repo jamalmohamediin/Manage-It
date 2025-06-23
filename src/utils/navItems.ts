@@ -1,15 +1,15 @@
+// src/utils/navItems.ts
 import {
   LucideIcon,
   LayoutDashboard,
-  Briefcase,
+  Stethoscope,
   Users,
   User,
+  Building2,
+  MonitorDot,
   ClipboardList,
   CalendarClock,
   Settings,
-  Building2,
-  MonitorDot,
-  Stethoscope,
 } from 'lucide-react';
 
 export interface NavItem {
@@ -18,15 +18,28 @@ export interface NavItem {
   icon: LucideIcon;
 }
 
-// ✅ MAIN APP NAVIGATION
+// Main application navigation, reordered and relabeled
 export const NAV_ITEMS: NavItem[] = [
-  { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { path: '/doctor', label: "Doctor's View", icon: Stethoscope },
-  { path: '/patients', label: 'Patients', icon: Users },
-  { path: '/receptionist', label: 'Receptionist View', icon: User },
-  { path: '/dashboard/profile', label: "Hospital's Dashboard", icon: Building2 },
-  { path: '/slates', label: 'Upcoming Cases/Slates', icon: MonitorDot }, // ✅ FIXED PATH
-  { path: '/tasks', label: 'Tasks', icon: ClipboardList },
-  { path: '/appointments', label: 'Appointments', icon: CalendarClock },
-  { path: '/settings/business', label: 'Settings', icon: Settings },
+  { path: '/doctor',                label: "Doctor's View",          icon: Stethoscope    },
+  { path: '/patients',              label: 'Patients',                icon: Users          },
+  { path: '/receptionist',          label: 'Receptionist View',      icon: User           },
+  { path: '/dashboard/profile',     label: "Hospital's Dashboard",    icon: Building2      },
+  { path: '/slates',                label: 'Upcoming Cases/Slates',   icon: MonitorDot     },
+  { path: '/tasks',                 label: 'Tasks',                   icon: ClipboardList },
+  { path: '/appointments',          label: 'Appointments',            icon: CalendarClock },
+  { path: '/dashboard',             label: 'Business Hub',            icon: LayoutDashboard },
+  { path: '/settings/business',     label: 'Settings',                icon: Settings       },
+];
+
+// (Optional) Client/Business-owner variant
+export const NAV_ITEMS_CLIENT: NavItem[] = [
+  { path: '/doctor',                label: "Business Owner's View",   icon: Stethoscope    },
+  { path: '/patients',              label: 'Clients',                 icon: Users          },
+  { path: '/receptionist',          label: 'Receptionist View',      icon: User           },
+  { path: '/dashboard/profile',     label: "Associate's View",        icon: Building2      },
+  { path: '/slates',                label: 'Upcoming Events',         icon: MonitorDot     },
+  { path: '/tasks',                 label: 'Tasks',                   icon: ClipboardList },
+  { path: '/appointments',          label: 'Appointments',            icon: CalendarClock },
+  { path: '/dashboard/patients',    label: 'Business Hub',            icon: LayoutDashboard },
+  { path: '/settings/business',     label: 'Settings',                icon: Settings       },
 ];
