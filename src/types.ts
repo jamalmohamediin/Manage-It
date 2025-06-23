@@ -20,10 +20,27 @@ export interface Patient {
   age: string;
   address: string;
   businessId: string;
-  medicalAidName?: string;           // ✅ NEW
-  ward?: string;                     // ✅ NEW
-  triageStatus?: string;             // ✅ NEW
-  specialInstructions?: string;      // ✅ NEW
+  ward?: string;
+  triageStatus?: string;
+  specialInstructions?: string;
+  medicalAidName?: string;
+  medicalAidNumber?: string;
+  medicalAidMainMember?: string;
+  comorbidities?: string[];
+  allergies?: {
+    medication?: string[];
+    food?: string[];
+    latex?: boolean;
+    otherMedication?: string;
+    otherFood?: string;
+  };
+  emergencyContacts?: {
+    name: string;
+    phone: string;
+  }[];
+  admissionStatus?: 'admitted' | 'discharged' | 'pending';
+  createdAt?: any;
+  updatedAt?: any;
 }
 
 export interface UserRole {

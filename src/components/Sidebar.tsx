@@ -17,11 +17,33 @@ const Sidebar: React.FC<SidebarProps> = ({ isVisible, onHideSidebar }) => {
   const businessId = useBusinessId();
   const [business, setBusiness] = useState<any>(null);
   const [slateCount, setSlateCount] = useState<number>(0);
+  const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    if (!businessId) return;
-    getBusinessById(businessId).then(setBusiness);
-    getUpcomingSlatesCount(businessId).then(setSlateCount);
+    if (!businessId) {
+      setLoading(false);
+      return;
+    }
+    
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const [businessData, slateCountData] = await Promise.all([
+          getBusinessById(businessId),
+          getUpcomingSlatesCount(businessId)
+        ]);
+        setBusiness(businessData);
+        setSlateCount(slateCountData);
+      } catch (error) {
+        console.error('Error fetching sidebar data:', error);
+        setBusiness(null);
+        setSlateCount(0);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
   }, [businessId]);
 
   // swipe-to-close on mobile
@@ -56,6 +78,9 @@ const Sidebar: React.FC<SidebarProps> = ({ isVisible, onHideSidebar }) => {
           src={logoUrl}
           alt="Business Logo"
           className="object-cover w-10 h-10 border border-yellow-700 rounded-full"
+          onError={(e) => {
+            (e.target as HTMLImageElement).src = '/default-logo.png';
+          }}
         />
         {isVisible && (
           <span className="text-lg font-bold truncate text-brown-700">
@@ -88,9 +113,14 @@ const Sidebar: React.FC<SidebarProps> = ({ isVisible, onHideSidebar }) => {
                   <Icon className="w-5 h-5" />
                   <span>{item.label}</span>
                 </div>
-                {showBadge && slateCount > 0 && (
+                {showBadge && slateCount > 0 && !loading && (
                   <span className="bg-yellow-700 text-white text-xs font-bold rounded-full px-2 py-0.5">
                     {slateCount}
+                  </span>
+                )}
+                {showBadge && loading && (
+                  <span className="bg-gray-300 text-gray-600 text-xs font-bold rounded-full px-2 py-0.5">
+                    ...
                   </span>
                 )}
               </button>

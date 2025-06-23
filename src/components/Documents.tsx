@@ -17,7 +17,7 @@ import 'react-datepicker/dist/react-datepicker.css';
 
 Modal.setAppElement('#root');
 
-const Documents = () => {
+const Documents: React.FC = () => {
   const { businessId } = useBusinessContext();
   const { user } = useUserContext();
   const [file, setFile] = useState<File | null>(null);

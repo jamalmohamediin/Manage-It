@@ -1,5 +1,3 @@
-// src/firebase/appointments.ts
-import { db } from './firebase-config';
 import {
   collection,
   addDoc,
@@ -12,6 +10,7 @@ import {
   doc,
   deleteDoc,
 } from 'firebase/firestore';
+import { db } from './firebase-config';
 import { Appointment } from '../types';
 
 // Add a new appointment
@@ -31,7 +30,25 @@ export async function getAppointments(businessId: string): Promise<Appointment[]
     orderBy('date', 'asc')
   );
   const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => ({
+  return snapshot.docs.map((doc) => ({
+    id: doc.id,
+    ...(doc.data() as Omit<Appointment, 'id'>),
+  }));
+}
+
+// — New: only fetch for a specific doctor
+export async function getDoctorAppointments(
+  businessId: string,
+  doctorId: string
+): Promise<Appointment[]> {
+  const q = query(
+    collection(db, 'appointments'),
+    where('businessId', '==', businessId),
+    where('doctorId', '==', doctorId),
+    orderBy('date', 'asc')
+  );
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map((doc) => ({
     id: doc.id,
     ...(doc.data() as Omit<Appointment, 'id'>),
   }));

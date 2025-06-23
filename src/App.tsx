@@ -20,8 +20,9 @@ import BusinessSettings from './components/BusinessSettings';
 import BusinessProfile from './pages/BusinessProfile';
 import PublicLanding from './pages/PublicLanding';
 import ClientView from './pages/ClientView';
-import NotificationList from './components/NotificationList';
-import DoctorView from './pages/DoctorView';
+// ❌ Temporarily disable NotificationList to fix 500 error
+// import NotificationList from './components/NotificationList';
+import DoctorDashboard from './pages/DoctorDashboard';
 import HospitalDashboard from './pages/HospitalDashboard';
 import UpcomingSlates from './pages/UpcomingSlates';
 
@@ -56,7 +57,7 @@ const App: React.FC = () => {
                     <Routes>
                       <Route path="/" element={<MainDashboard />} />
                       <Route path="/dashboard" element={<MainDashboard />} />
-                      <Route path="/doctor" element={<DoctorView />} />
+                      <Route path="/doctor" element={<DoctorDashboard />} />
                       <Route path="/hospital" element={<HospitalDashboard />} />
                       <Route path="/patients" element={<PatientList />} />
                       <Route path="/tasks/new" element={<TaskForm />} />
@@ -72,10 +73,13 @@ const App: React.FC = () => {
                       <Route path="/settings/business" element={<BusinessSettings />} />
                       <Route path="/industries" element={<PublicLanding />} />
                       <Route path="/client" element={<ClientView />} />
-                      <Route
+
+                      {/* TEMPORARILY DISABLED TO FIX 500 ERROR */}
+                      {/* <Route
                         path="/notifications"
                         element={<NotificationList notifications={[]} userId="" onUpdate={() => {}} />}
-                      />
+                      /> */}
+
                       <Route path="/slates" element={<UpcomingSlates />} />
                     </Routes>
                   </div>

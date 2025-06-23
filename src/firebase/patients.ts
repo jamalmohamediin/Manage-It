@@ -1,51 +1,56 @@
-import { db } from './firebase-config';
+// src/firebase/patients.ts
 import {
   collection,
-  addDoc,
   getDocs,
   query,
   where,
   Timestamp,
 } from 'firebase/firestore';
+import { db } from './firebase-config';
 import { Patient } from '../types';
 
-const patientsCollection = collection(db, 'patients');
-
-export async function addPatient(
-  patient: Omit<Patient, 'id' | 'createdAt' | 'updatedAt'>,
-  businessId: string
-) {
-  return await addDoc(patientsCollection, {
-    ...patient,
-    businessId,
-    createdAt: Timestamp.now(),
-    updatedAt: Timestamp.now(),
-  });
-}
-
+// fetch all patients for a business
 export async function getPatients(businessId: string): Promise<Patient[]> {
-  const q = query(patientsCollection, where('businessId', '==', businessId));
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Patient));
+  const snap = await getDocs(
+    query(
+      collection(db, 'patients'),
+      where('businessId', '==', businessId)
+    )
+  );
+  return snap.docs.map((doc) => ({ id: doc.id, ...(doc.data() as Patient) }));
 }
 
-// ✅ NEW — Get count of upcoming slates
+// fetch only currently admitted patients
+export async function getAdmittedPatients(businessId: string): Promise<Patient[]> {
+  const snap = await getDocs(
+    query(
+      collection(db, 'patients'),
+      where('businessId', '==', businessId),
+      where('admissionStatus', '==', 'admitted')
+    )
+  );
+  return snap.docs.map((doc) => ({ id: doc.id, ...(doc.data() as Patient) }));
+}
+
+// fetch upcoming slates count for a business (using appointments collection)
 export async function getUpcomingSlatesCount(businessId: string): Promise<number> {
-  const today = new Date();
-  const q = query(patientsCollection, where('businessId', '==', businessId));
-  const snapshot = await getDocs(q);
-
-  const upcomingPatients = snapshot.docs.filter((doc) => {
-    const patient = doc.data() as Patient;
-    if (!patient || !patient.dob) return false;
-
-    try {
-      const scheduledDate = new Date(patient.dob);
-      return scheduledDate >= today;
-    } catch {
-      return false;
-    }
-  });
-
-  return upcomingPatients.length;
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Start of today
+    const todayString = today.toISOString().split('T')[0]; // YYYY-MM-DD format
+    
+    // Query appointments collection for future dates
+    const snap = await getDocs(
+      query(
+        collection(db, 'appointments'),
+        where('businessId', '==', businessId),
+        where('date', '>=', todayString)
+      )
+    );
+    
+    return snap.size;
+  } catch (error) {
+    console.error('Error getting upcoming slates count:', error);
+    return 0;
+  }
 }
