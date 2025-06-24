@@ -4,7 +4,6 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import HeaderBar from './components/HeaderBar';
 import BusinessSelector from './components/BusinessSelector';
-import PatientForm from './components/PatientForm';
 import PatientList from './components/PatientList';
 import TaskForm from './components/TaskForm';
 import TaskList from './components/TaskList';
@@ -20,11 +19,13 @@ import BusinessSettings from './components/BusinessSettings';
 import BusinessProfile from './pages/BusinessProfile';
 import PublicLanding from './pages/PublicLanding';
 import ClientView from './pages/ClientView';
-// ❌ Temporarily disable NotificationList to fix 500 error
-// import NotificationList from './components/NotificationList';
 import DoctorDashboard from './pages/DoctorDashboard';
 import HospitalDashboard from './pages/HospitalDashboard';
 import UpcomingSlates from './pages/UpcomingSlates';
+
+import ClientDashboard from './pages/ClientDashboard';
+import ReceptionistView from './pages/ReceptionistView';
+import AssociateView from './pages/AssociateView';
 
 import { BusinessProvider } from './contexts/BusinessContext';
 import { UserProvider } from './contexts/UserContext';
@@ -74,13 +75,12 @@ const App: React.FC = () => {
                       <Route path="/industries" element={<PublicLanding />} />
                       <Route path="/client" element={<ClientView />} />
 
-                      {/* TEMPORARILY DISABLED TO FIX 500 ERROR */}
-                      {/* <Route
-                        path="/notifications"
-                        element={<NotificationList notifications={[]} userId="" onUpdate={() => {}} />}
-                      /> */}
-
                       <Route path="/slates" element={<UpcomingSlates />} />
+
+                      {/* ✅ Newly added business/client routes */}
+                      <Route path="/client-dashboard" element={<ClientDashboard />} />
+                      <Route path="/receptionist" element={<ReceptionistView />} />
+                      <Route path="/dashboard/profile" element={<AssociateView />} />
                     </Routes>
                   </div>
                 </div>

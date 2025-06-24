@@ -43,7 +43,7 @@ const TaskList: React.FC = () => {
               title: 'Prepare onboarding for Bob The Builder',
               assignedTo: 'Admin',
               notes: 'Send welcome package and schedule orientation.',
-              status: 'in progress' as Task['status'],
+              status: 'in progress',
               businessId,
               createdAt: new Date(),
               updatedAt: new Date(),
@@ -53,7 +53,7 @@ const TaskList: React.FC = () => {
               title: 'Finalize Q3 budget report for Naim Investments',
               assignedTo: 'Admin',
               notes: 'Needs to be sent to finance by EOD Friday.',
-              status: 'pending' as Task['status'],
+              status: 'pending',
               businessId,
               createdAt: new Date(),
               updatedAt: new Date(),
@@ -63,7 +63,7 @@ const TaskList: React.FC = () => {
               title: 'Review new job description for Marketing Lead',
               assignedTo: 'Admin',
               notes: 'Final review before posting.',
-              status: 'done' as Task['status'],
+              status: 'done',
               businessId,
               createdAt: new Date(),
               updatedAt: new Date(),
@@ -136,6 +136,12 @@ const TaskList: React.FC = () => {
                 <h3 className="text-lg font-semibold text-brown-700">{task.title}</h3>
                 <p className="mb-1 text-sm text-gray-600">Assigned To: {task.assignedTo || '—'}</p>
                 <p className="mb-1 text-sm text-gray-600">Note: {task.notes || '—'}</p>
+                <button
+                  onClick={() => openModal(task.id!)} // ✅ FIXED: added `!` to tell TS it won’t be undefined
+                  className="mt-2 text-sm text-blue-700 underline hover:text-blue-900"
+                >
+                  Upload File
+                </button>
               </div>
               <div className="flex-shrink-0 ml-4">
                 <select

@@ -1,46 +1,68 @@
 // src/firebase/roles.ts
 import {
   collection,
-  addDoc,
   getDocs,
   query,
   where,
   deleteDoc,
-  doc
+  doc,
+  setDoc,
+  serverTimestamp,
 } from 'firebase/firestore';
+
 import { db } from './firebase-config';
-import { toast } from 'react-hot-toast';
+import { UserRole } from '../types';
+import { addNotification, checkExistingExpiryNotification } from './notifications';
 
-export interface UserRole {
-  id?: string;
-  userId: string;
-  role: string;
-  permissions: string[];
-  expiresAt?: string;
-  businessId: string;
-  createdAt?: string;
-}
-
-// ✅ Add a user role to Firestore
-export async function addUserRole(data: Omit<UserRole, 'businessId'>, businessId: string) {
-  await addDoc(collection(db, 'roles'), {
-    ...data,
+export async function addUserRole(
+  roleData: Omit<UserRole, 'id' | 'createdAt' | 'updatedAt'>,
+  businessId: string
+) {
+  const newDoc = {
+    ...roleData,
     businessId,
-    createdAt: new Date().toISOString()
-  });
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  };
+  const ref = doc(collection(db, 'roles'));
+  await setDoc(ref, newDoc);
+
+  if (roleData.expiresAt) {
+    const alreadyExists = await checkExistingExpiryNotification(
+      roleData.userId,
+      roleData.role,
+      roleData.expiresAt
+    );
+
+    if (!alreadyExists) {
+      await addNotification(
+        {
+          userId: roleData.userId,
+          title: `Your ${roleData.role} role is expiring soon`,
+          body: `This role will expire on ${roleData.expiresAt}`,
+        },
+        {
+          metaType: 'role-expiry',
+          role: roleData.role,
+          expiryDate: roleData.expiresAt,
+        }
+      );
+    }
+  }
 }
 
-// ✅ Fetch all roles for a business
 export async function fetchAllRoles(businessId: string): Promise<UserRole[]> {
   const q = query(collection(db, 'roles'), where('businessId', '==', businessId));
   const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => ({
-    ...(doc.data() as UserRole),
-    id: doc.id,
-  }));
+  return snapshot.docs.map((docSnap) => {
+    const data = docSnap.data();
+    return {
+      id: docSnap.id,
+      ...data,
+    } as UserRole;
+  });
 }
 
-// ✅ Remove a user's role by userId + role + businessId
 export async function removeRoleAssignment(userId: string, role: string, businessId: string) {
   const q = query(
     collection(db, 'roles'),
@@ -48,13 +70,12 @@ export async function removeRoleAssignment(userId: string, role: string, busines
     where('role', '==', role),
     where('businessId', '==', businessId)
   );
-
   const snapshot = await getDocs(q);
-  const deletes = snapshot.docs.map((docSnap) => deleteDoc(doc(db, 'roles', docSnap.id)));
-  await Promise.all(deletes);
+  for (const d of snapshot.docs) {
+    await deleteDoc(doc(db, 'roles', d.id)); // ✅ correct delete usage
+  }
 }
 
-// ✅ Notify about roles expiring soon (within 7 days)
 export async function notifyExpiringRoles(businessId: string) {
   const q = query(collection(db, 'roles'), where('businessId', '==', businessId));
   const snapshot = await getDocs(q);
@@ -63,13 +84,27 @@ export async function notifyExpiringRoles(businessId: string) {
   const soon = new Date();
   soon.setDate(now.getDate() + 7);
 
-  const expiringRoles = snapshot.docs
-    .map(doc => ({ id: doc.id, ...(doc.data() as UserRole) }))
-    .filter(role => role.expiresAt && new Date(role.expiresAt) <= soon);
+  for (const d of snapshot.docs) {
+    const data = d.data() as UserRole;
+    if (!data.expiresAt || typeof data.expiresAt !== 'string') continue;
 
-  if (expiringRoles.length > 0) {
-    toast(`⏰ ${expiringRoles.length} role(s) expiring within 7 days`, {
-      icon: '⚠️',
-    });
+    const expiry = new Date(data.expiresAt);
+    if (expiry >= now && expiry <= soon) {
+      const exists = await checkExistingExpiryNotification(data.userId, data.role, data.expiresAt);
+      if (!exists) {
+        await addNotification(
+          {
+            userId: data.userId,
+            title: `Your ${data.role} role is expiring soon`,
+            body: `This role will expire on ${data.expiresAt}`,
+          },
+          {
+            metaType: 'role-expiry',
+            role: data.role,
+            expiryDate: data.expiresAt,
+          }
+        );
+      }
+    }
   }
 }

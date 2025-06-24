@@ -1,24 +1,48 @@
-// src/components/NotificationList.tsx
-import React from "react";
-import { markAsRead } from "../firebase/notifications";
+import React, { useEffect, useState } from "react";
+import { getUserNotifications, markAsRead } from "../firebase/notifications";
 import type { Notification } from "../firebase/notifications";
 
 interface Props {
-  notifications: Notification[];
   userId: string;
-  onUpdate: (updated: Notification[]) => void;
 }
 
-const NotificationList: React.FC<Props> = ({ notifications, userId, onUpdate }) => {
+const NotificationList: React.FC<Props> = ({ userId }) => {
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!userId) return;
+    const fetchData = async () => {
+      const data = await getUserNotifications(userId);
+      setNotifications(data.sort((a, b) => {
+        const timeA = a.createdAt?.seconds || 0;
+        const timeB = b.createdAt?.seconds || 0;
+        return timeB - timeA;
+      }));
+      setLoading(false);
+    };
+    fetchData();
+  }, [userId]);
+
   const handleMarkAsRead = async (notifId: string) => {
     await markAsRead(notifId);
-    onUpdate(notifications.map((n) => n.id === notifId ? { ...n, read: true } : n));
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === notifId ? { ...n, read: true } : n))
+    );
   };
+
+  if (loading) {
+    return (
+      <div className="p-6 text-center text-gray-400 bg-white shadow rounded-xl">
+        Loading notifications...
+      </div>
+    );
+  }
 
   if (!notifications.length) {
     return (
       <div className="p-6 text-center text-gray-500 bg-white shadow rounded-xl">
-        <p>🎉 You’re all caught up!</p>
+        🎉 You’re all caught up!
       </div>
     );
   }
@@ -33,7 +57,9 @@ const NotificationList: React.FC<Props> = ({ notifications, userId, onUpdate }) 
           <div className="flex-1">
             <div className="font-semibold text-brown-700">{n.title}</div>
             <div className="text-sm text-gray-700">{n.body}</div>
-            <div className="mt-1 text-xs text-gray-400">{formatTime(n.createdAt)}</div>
+            <div className="mt-1 text-xs text-gray-400">
+              {formatTime(n.createdAt)}
+            </div>
           </div>
           {!n.read && (
             <button

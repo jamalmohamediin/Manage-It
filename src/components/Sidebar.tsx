@@ -1,4 +1,3 @@
-// src/components/Sidebar.tsx
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { NAV_ITEMS } from '../utils/navItems';
@@ -24,7 +23,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isVisible, onHideSidebar }) => {
       setLoading(false);
       return;
     }
-    
+
     const fetchData = async () => {
       try {
         setLoading(true);
@@ -46,7 +45,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isVisible, onHideSidebar }) => {
     fetchData();
   }, [businessId]);
 
-  // swipe-to-close on mobile
   useEffect(() => {
     let startX = 0;
     const onStart = (e: TouchEvent) => (startX = e.touches[0].clientX);

@@ -35,7 +35,13 @@ const RoleForm: React.FC = () => {
 
     setSubmitting(true);
     try {
-      await addUserRole({ userId, role, permissions, expiresAt: expiresAt || undefined }, businessId);
+      await addUserRole({
+        userId,
+        role,
+        permissions,
+        expiresAt: expiresAt || undefined,
+        businessId, // ✅ INCLUDED TO FIX ERROR
+      }, businessId);
       toast.success('Role assigned');
       setUserId('');
       setRole('');

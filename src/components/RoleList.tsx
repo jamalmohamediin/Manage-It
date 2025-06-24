@@ -1,6 +1,9 @@
-// src/components/RoleList.tsx
 import React, { useEffect, useState, useContext } from 'react';
-import { fetchAllRoles, removeRoleAssignment, notifyExpiringRoles } from '../firebase/roles';
+import {
+  fetchAllRoles,
+  removeRoleAssignment,
+  notifyExpiringRoles
+} from '../firebase/roles';
 import { UserRole } from '../types';
 import { useBusinessId } from '../hooks/useBusinessId';
 import { toast } from 'react-hot-toast';
@@ -43,7 +46,7 @@ const RoleList: React.FC = () => {
     if (!businessId) return;
     setLoading(true);
     fetchAllRoles(businessId)
-      .then((data) => {
+      .then((data: UserRole[]) => {
         setRoles(data);
         localforage.setItem(LOCAL_KEY_PREFIX + businessId, data);
       })

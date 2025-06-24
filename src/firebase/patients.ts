@@ -1,10 +1,9 @@
-// src/firebase/patients.ts
 import {
   collection,
   getDocs,
   query,
   where,
-  Timestamp,
+  // Timestamp, // Removed unused import
 } from 'firebase/firestore';
 import { db } from './firebase-config';
 import { Patient } from '../types';
