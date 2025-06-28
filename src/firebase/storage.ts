@@ -110,3 +110,83 @@ export async function getUploadsForItem(
   const snap = await getDocs(collection(db, context, itemId, 'uploads'));
   return snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }));
 }
+
+// NEW: Enhanced function specifically for patient file uploads
+export async function uploadFileForPatient(
+  file: File,
+  patientId: string,
+  uploadedBy: string = 'current-user',
+  uploaderName: string = 'Healthcare Provider'
+): Promise<void> {
+  try {
+    const fileName = `${Date.now()}_${file.name}`;
+    const storagePath = `patients/${patientId}/files/${fileName}`;
+    const fileRef = ref(storage, storagePath);
+    
+    // Upload file to Firebase Storage
+    const snap = await uploadBytes(fileRef, file);
+    const downloadURL = await getDownloadURL(snap.ref);
+    
+    // Save metadata to Firestore
+    await addDoc(collection(db, 'patients', patientId, 'files'), {
+      fileName: file.name,
+      originalFileName: file.name,
+      fileURL: downloadURL,
+      fileSize: file.size,
+      fileType: file.type,
+      uploadedBy,
+      uploaderName,
+      uploadedAt: Timestamp.now(),
+      storagePath,
+    });
+    
+    console.log('File uploaded successfully:', fileName);
+  } catch (error) {
+    console.error('Error uploading file:', error);
+    throw new Error('Failed to upload file');
+  }
+}
+
+// NEW: Get all files for a specific patient
+export async function getPatientFiles(patientId: string): Promise<any[]> {
+  try {
+    const filesRef = collection(db, 'patients', patientId, 'files');
+    const snapshot = await getDocs(filesRef);
+    return snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+  } catch (error) {
+    console.error('Error fetching patient files:', error);
+    return [];
+  }
+}
+
+// NEW: Delete a patient file
+export async function deletePatientFile(
+  patientId: string,
+  fileId: string
+): Promise<void> {
+  try {
+    // Get file metadata first
+    const fileDoc = await getDoc(doc(db, 'patients', patientId, 'files', fileId));
+    
+    if (fileDoc.exists()) {
+      const fileData = fileDoc.data();
+      
+      // Delete from Storage
+      if (fileData.storagePath) {
+        const fileRef = ref(storage, fileData.storagePath);
+        await deleteObject(fileRef);
+      }
+      
+      // Delete metadata from Firestore
+      await deleteDoc(doc(db, 'patients', patientId, 'files', fileId));
+      
+      console.log('File deleted successfully');
+    }
+  } catch (error) {
+    console.error('Error deleting file:', error);
+    throw new Error('Failed to delete file');
+  }
+}

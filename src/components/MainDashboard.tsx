@@ -1,4 +1,3 @@
-// src/pages/MainDashboard.tsx
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useBusinessId } from '../hooks/useBusinessId';
@@ -7,6 +6,7 @@ import { getTasks, updateTask } from '../firebase/tasks';
 import { getPatients } from '../firebase/patients';
 import { toast } from 'react-hot-toast';
 import { useUserContext } from '../contexts/UserContext';
+import DoctorTabBar from '../components/DoctorTabBar';
 
 const MainDashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -55,14 +55,14 @@ const MainDashboard: React.FC = () => {
 
   const getTriageBadge = (status?: string) => {
     const base = 'px-2 py-1 rounded-full text-xs font-bold';
-    switch ((status||'').toLowerCase()) {
+    switch ((status || '').toLowerCase()) {
       case 'critical':
       case 'red': return <span className={`${base} bg-red-100 text-red-800`}>Critical</span>;
       case 'yellow':
       case 'moderate': return <span className={`${base} bg-yellow-100 text-yellow-800`}>Moderate</span>;
       case 'green':
       case 'stable': return <span className={`${base} bg-green-100 text-green-800`}>Stable</span>;
-      default: return <span className={`${base} bg-gray-200 text-gray-700`}>{status||'—'}</span>;
+      default: return <span className={`${base} bg-gray-200 text-gray-700`}>{status || '—'}</span>;
     }
   };
 
@@ -79,6 +79,8 @@ const MainDashboard: React.FC = () => {
 
   return (
     <div className="min-h-screen p-6 space-y-10 bg-gray-50">
+      <DoctorTabBar />
+
       {/* Welcome Card */}
       <div className="px-6 py-8 bg-white shadow rounded-xl">
         <h1 className="mb-2 text-2xl font-bold text-brown-700">{getGreeting()}</h1>
@@ -142,7 +144,7 @@ const MainDashboard: React.FC = () => {
                 className="flex items-center justify-between px-4 py-2 text-sm bg-white border border-gray-300 rounded shadow-sm"
               >
                 <div>
-                  <strong>{p.fullName}</strong> — Age: {p.age}, Gender: {p.gender}, Ward: {p.ward||'—'}
+                  <strong>{p.fullName}</strong> — Age: {p.age}, Gender: {p.gender}, Ward: {p.ward || '—'}
                 </div>
                 <div>{getTriageBadge(p.triageStatus)}</div>
               </li>

@@ -1,10 +1,11 @@
-import * as React from 'react';
+// src/main.tsx
+import React from 'react';
 import { createRoot } from 'react-dom/client';
 import './index.css';
 import App from './App';
 import { Toaster } from 'react-hot-toast';
 
-// ✅ Firebase config path fixed — keep this exactly as is
+// Firebase config path fixed — keep this exactly as is
 import './firebase/firebase-config';
 
 const container = document.getElementById('root');

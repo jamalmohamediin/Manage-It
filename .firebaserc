@@ -1,5 +1,7 @@
 {
   "projects": {
-    "default": "naim-app-dashboard"
-  }
+    "default": "manage-it-e8765"
+  },
+  "targets": {},
+  "etags": {}
 }

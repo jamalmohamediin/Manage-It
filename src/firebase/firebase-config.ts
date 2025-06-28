@@ -2,6 +2,7 @@
 import { initializeApp } from 'firebase/app';
 import { initializeFirestore, persistentLocalCache } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
+import { getFunctions } from "firebase/functions";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBh5MThllTDwnuQ3H6s-FBFN9eUC-GCKrM",
@@ -26,3 +27,6 @@ export const firestore = db;
 
 // ✅ Firebase Storage
 export const storage = getStorage(app);
+
+// ✅ Firebase Functions – FIXED to include the app
+export const functions = getFunctions(app);

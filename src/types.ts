@@ -1,3 +1,5 @@
+// types.ts
+
 export interface Task {
   id?: string;
   title: string;
@@ -75,4 +77,13 @@ export interface Appointment {
   doctorId?: string;
   createdAt?: any;
   updatedAt?: any;
+}
+
+export interface Prescription {
+  id?: string;
+  patientName: string;
+  medicationName: string;
+  dosage: string;
+  dateIssued?: string;
+  discontinued?: boolean;
 }

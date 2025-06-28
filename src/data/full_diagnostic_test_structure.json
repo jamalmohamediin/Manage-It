@@ -1,0 +1,119 @@
+{
+  "Point-of-Care Tests": {
+    "General": [
+      "Urine Dipstick",
+      "Pregnancy Test",
+      "Rapid HIV Test",
+      "Rapid Malaria Test",
+      "Blood Glucose (Fingerprick)"
+    ]
+  },
+  "Laboratory Tests": {
+    "Biochemistry": [
+      "Urea",
+      "Creatinine",
+      "Sodium",
+      "Potassium",
+      "Chloride",
+      "Bicarbonate",
+      "Calcium",
+      "Magnesium",
+      "Phosphate",
+      "Glucose",
+      "Liver Function Tests (LFTs)",
+      "Amylase",
+      "Lipase",
+      "Total Protein",
+      "Albumin"
+    ],
+    "Hematology": [
+      "Full Blood Count (FBC)",
+      "ESR",
+      "Peripheral Smear",
+      "Reticulocyte Count",
+      "Platelet Count",
+      "Coagulation Profile",
+      "INR",
+      "PT",
+      "aPTT"
+    ],
+    "Endocrinology": [
+      "Thyroid Stimulating Hormone (TSH)",
+      "Free T3",
+      "Free T4",
+      "Cortisol",
+      "Insulin",
+      "HbA1c",
+      "Parathyroid Hormone (PTH)",
+      "ACTH"
+    ],
+    "Tumor Markers": [
+      "PSA",
+      "CA-125",
+      "CA 19-9",
+      "CEA",
+      "AFP",
+      "β-hCG"
+    ],
+    "Infection Panels": [
+      "HIV ELISA",
+      "Hepatitis B Surface Antigen",
+      "Hepatitis C Antibody",
+      "COVID-19 PCR",
+      "TB GeneXpert",
+      "Syphilis RPR"
+    ]
+  },
+  "Imaging & Scans": {
+    "Radiology": [
+      "Chest X-Ray",
+      "Abdominal X-Ray",
+      "CT Brain",
+      "CT Abdomen",
+      "MRI Brain",
+      "MRI Spine",
+      "Ultrasound Abdomen",
+      "Pelvic Ultrasound",
+      "Breast Ultrasound"
+    ]
+  },
+  "Cardiac & Vascular": {
+    "Cardiology": [
+      "ECG",
+      "Echocardiogram",
+      "Cardiac Enzymes",
+      "Troponin I",
+      "CK-MB",
+      "Lipid Profile",
+      "D-Dimer"
+    ]
+  },
+  "Neurology & Mental": {
+    "Neurological": [
+      "EEG",
+      "MRI Brain",
+      "CT Brain",
+      "Lumbar Puncture (CSF Analysis)",
+      "Neuropsychological Testing"
+    ]
+  },
+  "Specialist Panels": {
+    "Rheumatology": [
+      "ANA",
+      "RF",
+      "Anti-CCP",
+      "CRP"
+    ],
+    "Toxicology": [
+      "Urine Drug Screen",
+      "Blood Alcohol Level",
+      "Paracetamol Level",
+      "Salicylate Level"
+    ],
+    "Genetic": [
+      "Karyotyping",
+      "BRCA1/2",
+      "CFTR Mutation Panel"
+    ]
+  }
+}
