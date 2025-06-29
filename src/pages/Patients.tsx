@@ -39,7 +39,8 @@ import {
   FileImage,
   Activity,
   Thermometer,
-  Zap
+  Zap,
+  CalendarClock
 } from 'lucide-react';
 
 // Vitals thresholds for auto-escalation
@@ -922,6 +923,7 @@ const FileManagementModal = ({
     </div>
   );
 };
+
 // Allergies Modal Component
 const AllergiesModal = ({ 
   isOpen, 
@@ -1146,6 +1148,7 @@ const AllergiesModal = ({
     </div>
   );
 };
+
 
 // Comorbidities Modal Component
 const ComorbiditiesModal = ({ 
@@ -1784,15 +1787,47 @@ const PatientModal = ({
                 className="w-full p-3 text-base border border-gray-300 sm:p-4 sm:text-lg rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
+{/* Row 3: Height, Weight, BMI */} 
+<div className="grid grid-cols-1 gap-3 mt-2 sm:grid-cols-3">
+  {/* Height */}
+  <input
+    type="number"
+    placeholder="Height (cm)"
+    value={formData.height}
+    onChange={(e) => handleInputChange('height', e.target.value)}
+    className="w-full p-3 text-base border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+  />
 
-            {/* Row 3: Diagnosis - Full Width */}
-            <input
-              type="text"
-              placeholder="Diagnosis"
-              value={formData.diagnosis}
-              onChange={(e) => handleInputChange('diagnosis', e.target.value)}
-              className="w-full p-3 text-base border border-gray-300 sm:p-4 sm:text-lg rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+  {/* Weight */}
+  <input
+    type="number"
+    placeholder="Weight (kg)"
+    value={formData.weight}
+    onChange={(e) => handleInputChange('weight', e.target.value)}
+    className="w-full p-3 text-base border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+  />
+
+  {/* BMI (calculated) */}
+  <input
+    type="text"
+    placeholder="BMI (auto)"
+    value={
+      formData.height && formData.weight
+        ? (
+            parseFloat(formData.height) > 0 && parseFloat(formData.weight) > 0
+              ? (
+                  parseFloat(formData.weight) /
+                  Math.pow(parseFloat(formData.height) / 100, 2)
+                ).toFixed(1)
+              : ''
+          )
+        : ''
+    }
+    readOnly
+    className="w-full p-3 text-base text-gray-600 bg-gray-100 border border-gray-300 cursor-not-allowed rounded-xl"
+  />
+</div>
+            
 
             {/* Row 4: Hospital/Medical Center - Full Width */}
             <input
@@ -1802,8 +1837,16 @@ const PatientModal = ({
               onChange={(e) => handleInputChange('hospital', e.target.value)}
               className="w-full p-3 text-base border border-gray-300 sm:p-4 sm:text-lg rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-
-            {/* Row 5: Procedure/Operation - Full Width */}
+{/* Row 5: Diagnosis - Full Width */}
+            <input
+              type="text"
+              placeholder="Diagnosis"
+              value={formData.diagnosis}
+              onChange={(e) => handleInputChange('diagnosis', e.target.value)}
+              className="w-full p-3 text-base border border-gray-300 sm:p-4 sm:text-lg rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            
+            {/* Row 6: Procedure/Operation - Full Width */}
             <input
               type="text"
               placeholder="Procedure/Operation (e.g., Laparoscopic Appendectomy) *"
@@ -1813,29 +1856,18 @@ const PatientModal = ({
               required
             />
 
-            {/* Row 6: Priority and Ward */}
-            <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2">
-              <select
-                value={formData.priority}
-                onChange={(e) => handleInputChange('priority', e.target.value)}
-                className="w-full p-3 text-base border border-gray-300 sm:p-4 sm:text-lg rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="critical">Critical Priority</option>
-                <option value="high">High Priority</option>
-                <option value="medium">Medium Priority</option>
-                <option value="low">Low Priority</option>
-                <option value="stable">Stable</option>
-              </select>
-              <input
-                type="text"
-                placeholder="Ward"
-                value={formData.ward}
-                onChange={(e) => handleInputChange('ward', e.target.value)}
-                className="w-full p-3 text-base border border-gray-300 sm:p-4 sm:text-lg rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
+         {/* Row 6: Ward Only (Priority Removed – Triage is Auto) */}
+<div className="grid grid-cols-1 gap-3 sm:gap-4">
+  <input
+    type="text"
+    placeholder="Ward"
+    value={formData.ward}
+    onChange={(e) => handleInputChange('ward', e.target.value)}
+    className="w-full p-3 text-base border border-gray-300 sm:p-4 sm:text-lg rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+  />
+</div>
 
-            {/* Row 7: Date, Time, Room */}
+            {/* Row 8: Date, Time, Room */}
             <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-3">
               <input
                 type="date"
@@ -1858,7 +1890,7 @@ const PatientModal = ({
               />
             </div>
 
-            {/* Row 8: Medical Aid Info */}
+            {/* Row 9: Medical Aid Info */}
             <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2">
               <input
                 type="text"
@@ -1876,7 +1908,8 @@ const PatientModal = ({
               />
             </div>
 
-            {/* Row 9: Allergies and Comorbidities - CLICKABLE BUTTONS */}
+
+            {/* Row 10: Allergies and Comorbidities - CLICKABLE BUTTONS */}
             <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2">
               <button
                 type="button"
@@ -1943,13 +1976,7 @@ const PatientModal = ({
               </button>
             </div>
 
-            {/* Row 10: Special Instructions - Full Width */}
-            <textarea
-              placeholder="Special Instructions (e.g., TO BE DONE LAST, HIGH PRIORITY from Mayo Clinic ICU)"
-              value={formData.notes ? formData.notes.join('\n') : ''}
-              onChange={(e) => handleInputChange('notes', e.target.value.split('\n'))}
-              className="w-full h-24 p-3 text-base border border-gray-300 resize-none sm:h-32 sm:p-4 sm:text-lg rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+           
 
             {/* Row 11: Enhanced File Management Buttons - UNLIMITED UPLOADS */}
             <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2">
@@ -1983,6 +2010,28 @@ const PatientModal = ({
                 <p className="text-xs text-green-600">Manage unlimited PDF documents and consent forms</p>
               </button>
             </div>
+
+
+ {/* Row 12: Special Instructions - Full Width */}
+            <textarea
+              placeholder="Special Instructions (e.g., TO BE DONE LAST, HIGH PRIORITY from Mayo Clinic ICU)"
+              value={formData.notes ? formData.notes.join('\n') : ''}
+              onChange={(e) => handleInputChange('notes', e.target.value.split('\n'))}
+              className="w-full h-24 p-3 text-base border border-gray-300 resize-none sm:h-32 sm:p-4 sm:text-lg rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+{/* Action Note - Displayed before Submit */}
+<div className="p-4 mt-4 text-sm text-yellow-800 bg-yellow-100 border border-yellow-300 rounded-xl">
+  <strong className="block mb-1 font-semibold">Please Note:</strong>
+  The following actions can be performed <span className="font-semibold">only after adding the patient</span>:
+  <ul className="mt-2 space-y-1 text-yellow-900 list-disc list-inside">
+    <li>Referring Patient</li>
+    <li>Booking Appointments</li>
+    <li>Booking Consultations</li>
+    <li>Adding / Removing Prescriptions</li>
+    <li>Booking Operations / Procedures</li>
+    <li>Ordering Diagnostics & Viewing Results</li>
+  </ul>
+</div>
 
             {/* Submit Buttons */}
             <div className="flex flex-col gap-3 mt-6 sm:gap-4 sm:mt-8 sm:flex-row">
@@ -2125,11 +2174,7 @@ const LinearPatientCard = ({
             patientId={patient.id}
             patient={patient}
           />
-          <PriorityDropdown
-            currentStatus={patient.priority}
-            onStatusChange={onStatusChange}
-            patientId={patient.id}
-          />
+        
           <button className="p-1 text-gray-400 hover:text-gray-600">
             {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </button>
@@ -2477,11 +2522,7 @@ const PatientDetailCard = ({
             </div>
           </div>
           <div className="flex items-center flex-shrink-0 gap-2">
-            <PriorityDropdown
-              currentStatus={patient.priority}
-              onStatusChange={onStatusChange}
-              patientId={patient.id}
-            />
+           
             <button
               onClick={() => onDelete(patient.id)}
               className="p-1 text-red-600 transition-colors hover:text-red-800 touch-manipulation"
@@ -3020,15 +3061,103 @@ const PatientDetailCard = ({
                 </div>
 
                 {/* Row 4: Refer Patient (full width) - CONNECTED BUTTON */}
-                <button 
-                  onClick={() => handleReferPatient(patient)}
-                  className="flex items-center justify-center w-full gap-2 px-3 py-2 text-sm text-red-600 bg-red-100 rounded-lg hover:bg-red-200"
-                >
-                  <User className="w-4 h-4" />
-                  Refer Patient
-                </button>
+                {/* Middle row: Escalate + Refer Patient */}
+<div className="grid grid-cols-2 gap-2 mt-2">
+  <button
+    onClick={() => {
+      setPatient({
+        id: patient.id.toString(),
+        name: patient.name,
+        age: patient.age,
+        gender: patient.gender,
+        mrn: patient.mrn,
+        contactNumber: patient.contactNumber,
+        diagnosis: patient.diagnosis
+      });
+      setPendingAction('escalate');
+      navigate('/alerts');
+    }}
+    className="flex items-center justify-center gap-2 px-3 py-2 text-sm text-red-600 bg-red-100 rounded-lg hover:bg-red-200"
+  >
+    <AlertTriangle className="w-4 h-4" />
+    Escalate
+  </button>
+
+  <button
+    onClick={() => handleReferPatient(patient)}
+    className="flex items-center justify-center gap-2 px-3 py-2 text-sm text-red-600 bg-red-100 rounded-lg hover:bg-red-200"
+  >
+    <User className="w-4 h-4" />
+    Refer Patient
+  </button>
+</div>
+{/* Bottom row: Full width Discharge */}
+<div className="mt-2">
+  <button
+    onClick={() => {
+      setPatient({
+        id: patient.id.toString(),
+        name: patient.name,
+        age: patient.age,
+        gender: patient.gender,
+        mrn: patient.mrn,
+        contactNumber: patient.contactNumber,
+        diagnosis: patient.diagnosis
+      });
+      setPendingAction('discharge');
+      navigate('/tasks');
+    }}
+    className="flex items-center justify-center w-full gap-2 px-3 py-2 text-sm text-yellow-600 bg-yellow-100 rounded-lg hover:bg-yellow-200"
+  >
+    <User className="w-4 h-4" />
+    Discharge
+  </button>
+
               </div>
             </div>
+                <button
+    onClick={() => {
+      setPatient({
+        id: patient.id.toString(),
+        name: patient.name,
+        age: patient.age,
+        gender: patient.gender,
+        mrn: patient.mrn,
+        contactNumber: patient.contactNumber,
+        diagnosis: patient.diagnosis
+      });
+      setPendingAction('consultation');
+      navigate('/consultations');
+    }}
+    className="flex items-center justify-center w-full gap-2 px-3 py-2 text-sm text-purple-600 bg-purple-100 rounded-lg hover:bg-purple-200"
+  >
+    <Stethoscope className="w-4 h-4" />
+    Book Consultation
+  </button>
+
+  <button
+    onClick={() => {
+      setPatient({
+        id: patient.id.toString(),
+        name: patient.name,
+        age: patient.age,
+        gender: patient.gender,
+        mrn: patient.mrn,
+        contactNumber: patient.contactNumber,
+        diagnosis: patient.diagnosis
+      });
+      setPendingAction('appointment');
+      navigate('/appointments');
+    }}
+    className="flex items-center justify-center w-full gap-2 px-3 py-2 text-sm text-blue-600 bg-blue-100 rounded-lg hover:bg-blue-200"
+  >
+    <CalendarClock className="w-4 h-4" />
+    Book Appointment
+  </button>
+</div>
+
+
+
 
             {/* Latest Notes - Exactly as in image with proper border */}
             <div className="p-4 bg-white border-2 border-gray-300 rounded-lg shadow-sm">
@@ -3852,10 +3981,7 @@ const Patients: React.FC = () => {
                   <h4 className="font-semibold text-gray-800">Medical Details</h4>
                   <div className="space-y-3">
                     <div>
-                      <span className="block mb-1 text-sm font-medium text-gray-600">Priority</span>
-                      <span className={`inline-block px-2 py-1 text-xs rounded-full ${getStatusColor(selectedPatient.priority)}`}>
-                        {selectedPatient.priority}
-                      </span>
+                      
                     </div>
                     <div>
                       <span className="block mb-1 text-sm font-medium text-gray-600">Triage Status</span>
@@ -3980,3 +4106,7 @@ const Patients: React.FC = () => {
 };
 
 export default Patients;
+
+
+
+

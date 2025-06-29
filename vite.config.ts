@@ -6,7 +6,7 @@ export default defineConfig({
     react({
       include: "**/*.{jsx,tsx}",
       exclude: /node_modules/,
-      jsxRuntime: 'automatic', // Explicitly set JSX runtime to automatic
+      jsxRuntime: 'automatic', // Setting to automatic for modern React JSX transform
     })
   ],
   server: {

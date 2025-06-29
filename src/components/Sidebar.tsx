@@ -1,4 +1,3 @@
-/* @vite-ignore */
 import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
@@ -64,7 +63,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isVisible, onHideSidebar }) => {
               }
             >
               <div className="flex items-center gap-3">
-                {React.createElement(Icon, { size: 20, className: "shrink-0" })}
+                <Icon size={20} className="shrink-0" />
                 <span className={`truncate ${!isVisible ? 'hidden' : ''}`}>{item.label}</span>
               </div>
             </NavLink>
