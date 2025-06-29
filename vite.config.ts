@@ -6,6 +6,7 @@ export default defineConfig({
     react({
       include: "**/*.{jsx,tsx}",
       exclude: /node_modules/,
+      jsxRuntime: 'automatic', // Explicitly set JSX runtime to automatic
     })
   ],
   server: {
@@ -22,6 +23,6 @@ export default defineConfig({
     extensions: ['.js', '.jsx', '.ts', '.tsx'],
   },
   optimizeDeps: {
-    exclude: ['@vitejs/plugin-react'],
+    // exclude: ['@vitejs/plugin-react'], // Removed as it might interfere with preamble detection
   },
 });

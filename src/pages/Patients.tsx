@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelectedPatient } from '../contexts/SelectedPatientContext';
 import { uploadFileWithMetadata, getUploadsForItem } from '../firebase/storage';
+import { addNotification } from '../firebase/notifications';
+import localforage from 'localforage';
 import { 
   UserPlus, 
   Search, 
@@ -31,8 +33,24 @@ import {
   Eye,
   Upload,
   Plus,
-  Check
+  Check,
+  Play,
+  Image,
+  FileImage,
+  Activity,
+  Thermometer,
+  Zap
 } from 'lucide-react';
+
+// Vitals thresholds for auto-escalation
+const vitalThresholds = {
+  heartRate: { min: 60, max: 100 },
+  systolicBP: { min: 90, max: 120 },
+  diastolicBP: { min: 60, max: 80 },
+  respiratoryRate: { min: 12, max: 20 },
+  oxygenSaturation: { min: 95, max: 100 },
+  temperature: { min: 36.1, max: 37.5 },
+};
 
 // Extended Patient Type that includes the additional fields we need
 type ExtendedPatient = {
@@ -57,6 +75,14 @@ type ExtendedPatient = {
     temp: string;
     spo2: string;
     rr: string;
+    // Enhanced vitals for auto-escalation
+    heartRate?: number;
+    systolicBP?: number;
+    diastolicBP?: number;
+    respiratoryRate?: number;
+    oxygenSaturation?: number;
+    temperature?: number;
+    lastUpdated?: string;
   };
   status: string;
   prescriptions: string[];
@@ -74,6 +100,77 @@ type ExtendedPatient = {
   customAllergies?: string;
   selectedComorbidities?: string[];
   customComorbidities?: string;
+  // Triage fields
+  triageStatus?: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+  lastTriageUpdate?: string;
+  abnormalVitals?: string[];
+};
+
+// Vitals evaluation function
+const evaluateVitals = (vitals: ExtendedPatient['vitals']): {
+  triageStatus: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+  abnormalVitals: string[];
+  criticalityScore: number;
+} => {
+  const abnormalVitals: string[] = [];
+  let criticalityScore = 0;
+
+  // Check heart rate
+  if (vitals.heartRate) {
+    if (vitals.heartRate < vitalThresholds.heartRate.min || vitals.heartRate > vitalThresholds.heartRate.max) {
+      abnormalVitals.push('Heart Rate');
+      criticalityScore += vitals.heartRate < 50 || vitals.heartRate > 120 ? 2 : 1;
+    }
+  }
+
+  // Check blood pressure
+  if (vitals.systolicBP && vitals.diastolicBP) {
+    if (vitals.systolicBP < vitalThresholds.systolicBP.min || vitals.systolicBP > vitalThresholds.systolicBP.max) {
+      abnormalVitals.push('Systolic BP');
+      criticalityScore += vitals.systolicBP < 80 || vitals.systolicBP > 140 ? 2 : 1;
+    }
+    if (vitals.diastolicBP < vitalThresholds.diastolicBP.min || vitals.diastolicBP > vitalThresholds.diastolicBP.max) {
+      abnormalVitals.push('Diastolic BP');
+      criticalityScore += vitals.diastolicBP < 50 || vitals.diastolicBP > 90 ? 2 : 1;
+    }
+  }
+
+  // Check respiratory rate
+  if (vitals.respiratoryRate) {
+    if (vitals.respiratoryRate < vitalThresholds.respiratoryRate.min || vitals.respiratoryRate > vitalThresholds.respiratoryRate.max) {
+      abnormalVitals.push('Respiratory Rate');
+      criticalityScore += vitals.respiratoryRate < 10 || vitals.respiratoryRate > 25 ? 2 : 1;
+    }
+  }
+
+  // Check oxygen saturation
+  if (vitals.oxygenSaturation) {
+    if (vitals.oxygenSaturation < vitalThresholds.oxygenSaturation.min) {
+      abnormalVitals.push('Oxygen Saturation');
+      criticalityScore += vitals.oxygenSaturation < 90 ? 3 : 1;
+    }
+  }
+
+  // Check temperature
+  if (vitals.temperature) {
+    if (vitals.temperature < vitalThresholds.temperature.min || vitals.temperature > vitalThresholds.temperature.max) {
+      abnormalVitals.push('Temperature');
+      criticalityScore += vitals.temperature < 35 || vitals.temperature > 39 ? 2 : 1;
+    }
+  }
+
+  // Determine triage status
+  let triageStatus: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' = 'LOW';
+  
+  if (criticalityScore >= 5 || abnormalVitals.length >= 3) {
+    triageStatus = 'CRITICAL';
+  } else if (criticalityScore >= 3 || abnormalVitals.length >= 2) {
+    triageStatus = 'HIGH';
+  } else if (criticalityScore >= 1 || abnormalVitals.length >= 1) {
+    triageStatus = 'MEDIUM';
+  }
+
+  return { triageStatus, abnormalVitals, criticalityScore };
 };
 
 // Structured allergy categories
@@ -147,7 +244,7 @@ const COMORBIDITIES_OPTIONS = [
   "Substance Use Disorder"
 ];
 
-// Enhanced initial patients with comprehensive medical data
+// Enhanced initial patients with comprehensive medical data and real vitals
 const initialPatients: ExtendedPatient[] = [
   {
     id: 1,
@@ -170,7 +267,15 @@ const initialPatients: ExtendedPatient[] = [
       hr: "110",
       temp: "38.5°C",
       spo2: "92%",
-      rr: "24"
+      rr: "24",
+      // Enhanced vitals for auto-escalation
+      heartRate: 110,
+      systolicBP: 85,
+      diastolicBP: 50,
+      respiratoryRate: 24,
+      oxygenSaturation: 92,
+      temperature: 38.5,
+      lastUpdated: new Date().toISOString()
     },
     status: "Post-operative complications",
     prescriptions: ["Morphine 10mg IV q4h", "Cefazolin 1g IV q8h"],
@@ -192,7 +297,9 @@ const initialPatients: ExtendedPatient[] = [
     scheduledTime: "08:00 AM",
     scheduledDate: "2025-06-27",
     selectedAllergies: ["Penicillin", "Latex (gloves, bandages, catheters)"],
-    selectedComorbidities: ["Hypertension (High Blood Pressure)", "Diabetes"]
+    selectedComorbidities: ["Hypertension (High Blood Pressure)", "Diabetes"],
+    triageStatus: 'CRITICAL',
+    abnormalVitals: ['Heart Rate', 'Systolic BP', 'Diastolic BP', 'Oxygen Saturation', 'Temperature']
   },
   {
     id: 2,
@@ -215,7 +322,15 @@ const initialPatients: ExtendedPatient[] = [
       hr: "88",
       temp: "37.2°C",
       spo2: "98%",
-      rr: "18"
+      rr: "18",
+      // Enhanced vitals for auto-escalation
+      heartRate: 88,
+      systolicBP: 120,
+      diastolicBP: 80,
+      respiratoryRate: 18,
+      oxygenSaturation: 98,
+      temperature: 37.2,
+      lastUpdated: new Date().toISOString()
     },
     status: "Pre-operative",
     prescriptions: ["Omeprazole 40mg PO daily"],
@@ -235,7 +350,9 @@ const initialPatients: ExtendedPatient[] = [
     scheduledTime: "10:30 AM",
     scheduledDate: "2025-06-27",
     selectedAllergies: [],
-    selectedComorbidities: []
+    selectedComorbidities: [],
+    triageStatus: 'MEDIUM',
+    abnormalVitals: ['Temperature']
   },
   {
     id: 3,
@@ -258,7 +375,15 @@ const initialPatients: ExtendedPatient[] = [
       hr: "72",
       temp: "36.8°C",
       spo2: "99%",
-      rr: "16"
+      rr: "16",
+      // Enhanced vitals for auto-escalation
+      heartRate: 72,
+      systolicBP: 130,
+      diastolicBP: 85,
+      respiratoryRate: 16,
+      oxygenSaturation: 99,
+      temperature: 36.8,
+      lastUpdated: new Date().toISOString()
     },
     status: "Stable",
     prescriptions: ["Paracetamol 1g PO q6h PRN"],
@@ -277,7 +402,9 @@ const initialPatients: ExtendedPatient[] = [
     scheduledTime: "14:00 PM",
     scheduledDate: "2025-06-27",
     selectedAllergies: ["Sulfa Drugs (e.g., Bactrim)"],
-    selectedComorbidities: ["Chronic Obstructive Pulmonary Disease (COPD)"]
+    selectedComorbidities: ["Chronic Obstructive Pulmonary Disease (COPD)"],
+    triageStatus: 'MEDIUM',
+    abnormalVitals: ['Systolic BP', 'Diastolic BP']
   }
 ];
 
@@ -304,20 +431,131 @@ const getStatusBorderColor = (status: string) => {
   }
 };
 
-// File Upload/Download Modal Component
+// Triage status colors
+const getTriageColor = (triageStatus?: string) => {
+  switch (triageStatus) {
+    case 'CRITICAL': return 'bg-red-100 text-red-700 border-red-200 animate-pulse';
+    case 'HIGH': return 'bg-orange-100 text-orange-700 border-orange-200';
+    case 'MEDIUM': return 'bg-yellow-100 text-yellow-700 border-yellow-200';
+    case 'LOW': return 'bg-green-100 text-green-700 border-green-200';
+    default: return 'bg-gray-100 text-gray-700 border-gray-200';
+  }
+};
+
+const getTriageBorderColor = (triageStatus?: string) => {
+  switch (triageStatus) {
+    case 'CRITICAL': return 'border-l-red-500';
+    case 'HIGH': return 'border-l-orange-500';
+    case 'MEDIUM': return 'border-l-yellow-500';
+    case 'LOW': return 'border-l-green-500';
+    default: return 'border-l-gray-500';
+  }
+};
+
+// Get vital status for styling
+const getVitalStatus = (vitalName: string, value?: number) => {
+  if (value === undefined) return 'normal';
+  
+  switch (vitalName) {
+    case 'heartRate':
+      return (value < vitalThresholds.heartRate.min || value > vitalThresholds.heartRate.max) ? 'abnormal' : 'normal';
+    case 'systolicBP':
+      return (value < vitalThresholds.systolicBP.min || value > vitalThresholds.systolicBP.max) ? 'abnormal' : 'normal';
+    case 'diastolicBP':
+      return (value < vitalThresholds.diastolicBP.min || value > vitalThresholds.diastolicBP.max) ? 'abnormal' : 'normal';
+    case 'respiratoryRate':
+      return (value < vitalThresholds.respiratoryRate.min || value > vitalThresholds.respiratoryRate.max) ? 'abnormal' : 'normal';
+    case 'oxygenSaturation':
+      return (value < vitalThresholds.oxygenSaturation.min) ? 'abnormal' : 'normal';
+    case 'temperature':
+      return (value < vitalThresholds.temperature.min || value > vitalThresholds.temperature.max) ? 'abnormal' : 'normal';
+    default:
+      return 'normal';
+  }
+};
+
+const getVitalColor = (status: string) => {
+  return status === 'abnormal' ? 'bg-red-100 text-red-700 animate-pulse border-red-300' : 'bg-green-100 text-green-700 border-green-300';
+};
+
+// File preview component
+const FilePreview = ({ file }: { file: any }) => {
+  const getFileType = (fileName: string) => {
+    const extension = fileName.split('.').pop()?.toLowerCase();
+    if (['jpg', 'jpeg', 'png', 'gif', 'bmp'].includes(extension || '')) return 'image';
+    if (['mp4', 'mov', 'avi', 'wmv', 'flv'].includes(extension || '')) return 'video';
+    if (['pdf'].includes(extension || '')) return 'pdf';
+    return 'document';
+  };
+
+  const fileType = getFileType(file.fileName);
+
+  switch (fileType) {
+    case 'image':
+      return (
+        <div className="relative group">
+          <img 
+            src={file.fileURL} 
+            alt={file.fileName}
+            className="object-cover w-full h-32 rounded-lg"
+          />
+          <div className="absolute inset-0 flex items-center justify-center transition-opacity bg-black bg-opacity-50 rounded-lg opacity-0 group-hover:opacity-100">
+            <Eye className="w-6 h-6 text-white" />
+          </div>
+        </div>
+      );
+    case 'video':
+      return (
+        <div className="relative group">
+          <video 
+            src={file.fileURL}
+            className="object-cover w-full h-32 rounded-lg"
+            controls={false}
+          />
+          <div className="absolute inset-0 flex items-center justify-center transition-opacity bg-black bg-opacity-50 rounded-lg opacity-0 group-hover:opacity-100">
+            <Play className="w-8 h-8 text-white" />
+          </div>
+        </div>
+      );
+    case 'pdf':
+      return (
+        <div className="flex items-center justify-center w-full h-32 bg-red-100 rounded-lg">
+          <div className="text-center">
+            <FileText className="w-8 h-8 mx-auto mb-2 text-red-600" />
+            <p className="text-xs text-red-600">PDF Document</p>
+          </div>
+        </div>
+      );
+    default:
+      return (
+        <div className="flex items-center justify-center w-full h-32 bg-blue-100 rounded-lg">
+          <div className="text-center">
+            <FileText className="w-8 h-8 mx-auto mb-2 text-blue-600" />
+            <p className="text-xs text-blue-600">Document</p>
+          </div>
+        </div>
+      );
+  }
+};
+
+// Enhanced File Upload/Download/View Modal Component - UNLIMITED UPLOADS + VIEW FUNCTIONALITY
 const FileManagementModal = ({ 
   isOpen, 
   onClose, 
-  patient 
+  patient,
+  fileType = 'documents' // 'documents' or 'consent'
 }: {
   isOpen: boolean;
   onClose: () => void;
   patient: ExtendedPatient;
+  fileType?: 'documents' | 'consent';
 }) => {
   const [files, setFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [patientFiles, setPatientFiles] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<'upload' | 'download'>('upload');
+  const [activeTab, setActiveTab] = useState<'upload' | 'view' | 'download'>('view');
+  const [selectedFile, setSelectedFile] = useState<any>(null);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -329,7 +567,8 @@ const FileManagementModal = ({
 
   const loadPatientFiles = async () => {
     try {
-      const uploads = await getUploadsForItem('patients', patient.id.toString());
+      const context = fileType === 'consent' ? 'consent-forms' : 'patients';
+      const uploads = await getUploadsForItem(context, patient.id.toString());
       setPatientFiles(uploads);
     } catch (error) {
       console.error('Error loading patient files:', error);
@@ -338,43 +577,46 @@ const FileManagementModal = ({
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      setFiles(Array.from(e.target.files));
+      const selectedFiles = Array.from(e.target.files);
+      // REMOVED LIMIT: Now allows unlimited files for both document types
+      setFiles(selectedFiles);
     }
   };
 
   const handleUpload = async () => {
-  if (files.length === 0) {
-    alert('Please select files to upload');
-    return;
-  }
+    if (files.length === 0) {
+      alert('Please select files to upload');
+      return;
+    }
 
-  setUploading(true);
-  try {
-    for (const file of files) {
-      // FIXED: Use the correct function parameters
-      await uploadFileWithMetadata(
-        file,
-        patient.id.toString(),        // itemId
-        'default-business-id',        // businessId
-        'healthcare-provider',        // role
-        'patients',                   // context
-        'current-user-id',           // uploadedBy
-        'Current User'               // uploaderName
-      );
+    setUploading(true);
+    try {
+      for (const file of files) {
+        const context = fileType === 'consent' ? 'consent-forms' : 'patients';
+        await uploadFileWithMetadata(
+          file,
+          patient.id.toString(),
+          'default-business-id',
+          'healthcare-provider',
+          context,
+          'current-user-id',
+          'Current User'
+        );
+      }
+      const fileTypeText = fileType === 'consent' ? 'Consent forms' : 'Files';
+      alert(`${fileTypeText} uploaded successfully!`);
+      setFiles([]);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      await loadPatientFiles();
+    } catch (error) {
+      console.error('Upload error:', error);
+      alert('Failed to upload files');
+    } finally {
+      setUploading(false);
     }
-    alert('Files uploaded successfully!');
-    setFiles([]);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-    await loadPatientFiles();
-  } catch (error) {
-    console.error('Upload error:', error);
-    alert('Failed to upload files');
-  } finally {
-    setUploading(false);
-  }
-};
+  };
 
   const handleDownload = (fileURL: string, fileName: string) => {
     const link = document.createElement('a');
@@ -386,7 +628,23 @@ const FileManagementModal = ({
     document.body.removeChild(link);
   };
 
+  const handlePreview = (file: any) => {
+    setSelectedFile(file);
+    setShowPreviewModal(true);
+  };
+
+  const openFileInNewTab = (fileURL: string) => {
+    window.open(fileURL, '_blank');
+  };
+
   if (!isOpen) return null;
+
+  const modalTitle = fileType === 'consent' ? 'Documents & Consent Forms' : 'Images/Videos';
+  const uploadText = fileType === 'consent' ? 'Upload Documents & Consent Forms' : 'Upload Images/Videos';
+  const viewText = fileType === 'consent' ? 'View Documents & Consent Forms' : 'View Images/Videos';
+  const downloadText = fileType === 'consent' ? 'Download Documents & Consent Forms' : 'Download Images/Videos';
+  const acceptTypes = fileType === 'consent' ? '.pdf,.doc,.docx' : '.pdf,.doc,.docx,.jpg,.jpeg,.png,.mp4,.mov,.avi';
+  const uploadDescription = fileType === 'consent' ? 'PDF documents and consent forms (unlimited)' : 'Images, videos, and documents (unlimited)';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
@@ -394,15 +652,26 @@ const FileManagementModal = ({
         <div className="p-6">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold text-gray-800">
-              File Management - {patient.name}
+              {modalTitle} - {patient.name}
             </h2>
             <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
               <X className="w-6 h-6" />
             </button>
           </div>
 
-          {/* Tab Navigation */}
+          {/* Enhanced Tab Navigation - WITH VIEW TAB */}
           <div className="flex p-1 mb-6 bg-gray-100 rounded-lg">
+            <button
+              onClick={() => setActiveTab('view')}
+              className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+                activeTab === 'view'
+                  ? 'bg-white text-blue-600 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <Eye className="inline w-4 h-4 mr-2" />
+              {viewText}
+            </button>
             <button
               onClick={() => setActiveTab('upload')}
               className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
@@ -412,7 +681,7 @@ const FileManagementModal = ({
               }`}
             >
               <Upload className="inline w-4 h-4 mr-2" />
-              Upload Files
+              {uploadText}
             </button>
             <button
               onClick={() => setActiveTab('download')}
@@ -423,19 +692,87 @@ const FileManagementModal = ({
               }`}
             >
               <Download className="inline w-4 h-4 mr-2" />
-              Download Files
+              {downloadText}
             </button>
           </div>
 
-          {/* Upload Tab */}
+          {/* View Tab - NEW FEATURE FOR DOCUMENT VIEWING */}
+          {activeTab === 'view' && (
+            <div className="space-y-4">
+              {patientFiles.length > 0 ? (
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {patientFiles.map((file, index) => (
+                    <div key={index} className="p-4 border border-gray-200 rounded-lg bg-gray-50">
+                      <div 
+                        className="mb-3 cursor-pointer"
+                        onClick={() => handlePreview(file)}
+                      >
+                        <FilePreview file={file} />
+                      </div>
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium text-gray-800 truncate" title={file.fileName}>
+                          {file.fileName}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          Uploaded {file.uploadedAt?.toDate?.()?.toLocaleDateString?.() || 'Recently'}
+                        </p>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => openFileInNewTab(file.fileURL)}
+                            className="flex-1 px-2 py-1 text-xs text-blue-600 bg-blue-100 rounded hover:bg-blue-200"
+                          >
+                            <Eye className="inline w-3 h-3 mr-1" />
+                            View
+                          </button>
+                          <button
+                            onClick={() => handleDownload(file.fileURL, file.fileName)}
+                            className="flex-1 px-2 py-1 text-xs text-green-600 bg-green-100 rounded hover:bg-green-200"
+                          >
+                            <Download className="inline w-3 h-3 mr-1" />
+                            Download
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="py-12 text-center">
+                  <div className="mb-4">
+                    {fileType === 'consent' ? (
+                      <FileText className="w-16 h-16 mx-auto text-gray-400" />
+                    ) : (
+                      <Image className="w-16 h-16 mx-auto text-gray-400" />
+                    )}
+                  </div>
+                  <p className="mb-2 text-lg font-medium text-gray-600">No files uploaded yet</p>
+                  <p className="mb-4 text-gray-500">
+                    {fileType === 'consent' 
+                      ? 'Upload documents and consent forms to view them here' 
+                      : 'Upload images and videos to view them here'
+                    }
+                  </p>
+                  <button
+                    onClick={() => setActiveTab('upload')}
+                    className="px-4 py-2 text-blue-600 bg-blue-100 rounded-lg hover:bg-blue-200"
+                  >
+                    <Upload className="inline w-4 h-4 mr-2" />
+                    Upload Files
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Upload Tab - UNLIMITED UPLOADS */}
           {activeTab === 'upload' && (
             <div className="space-y-4">
               <div className="p-6 text-center border-2 border-gray-300 border-dashed rounded-lg">
                 <input
                   ref={fileInputRef}
                   type="file"
-                  multiple
-                  accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.mp4,.mov,.avi"
+                  multiple // REMOVED LIMIT: Now always allows multiple files
+                  accept={acceptTypes}
                   onChange={handleFileSelect}
                   className="hidden"
                   id="file-upload"
@@ -443,31 +780,40 @@ const FileManagementModal = ({
                 <label htmlFor="file-upload" className="cursor-pointer">
                   <Upload className="w-12 h-12 mx-auto mb-4 text-gray-400" />
                   <p className="mb-2 text-lg font-medium text-gray-900">
-                    Upload Patient Documents
+                    {fileType === 'consent' ? 'Upload Documents & Consent Forms' : 'Upload Images/Videos'}
                   </p>
                   <p className="text-sm text-gray-500">
-                    PDF, Word documents, images, videos up to 10MB each
+                    {uploadDescription}
                   </p>
                 </label>
               </div>
 
               {files.length > 0 && (
                 <div className="space-y-2">
-                  <h4 className="font-medium text-gray-800">Selected Files:</h4>
-                  {files.map((file, index) => (
-                    <div key={index} className="flex items-center justify-between p-2 rounded bg-gray-50">
-                      <span className="text-sm text-gray-700">{file.name}</span>
-                      <span className="text-xs text-gray-500">
-                        {(file.size / 1024 / 1024).toFixed(2)} MB
-                      </span>
-                    </div>
-                  ))}
+                  <h4 className="font-medium text-gray-800">Selected Files ({files.length}):</h4>
+                  <div className="space-y-2 overflow-y-auto max-h-32">
+                    {files.map((file, index) => (
+                      <div key={index} className="flex items-center justify-between p-2 rounded bg-gray-50">
+                        <div className="flex items-center gap-2">
+                          <div className="text-lg">
+                            {file.type.startsWith('image/') ? '🖼️' : 
+                             file.type.startsWith('video/') ? '🎥' : 
+                             file.type === 'application/pdf' ? '📄' : '📁'}
+                          </div>
+                          <span className="text-sm text-gray-700">{file.name}</span>
+                        </div>
+                        <span className="text-xs text-gray-500">
+                          {(file.size / 1024 / 1024).toFixed(2)} MB
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                   <button
                     onClick={handleUpload}
                     disabled={uploading}
                     className="w-full px-4 py-2 mt-4 text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
                   >
-                    {uploading ? 'Uploading...' : 'Upload Files'}
+                    {uploading ? `Uploading ${files.length} files...` : `Upload ${files.length} Files`}
                   </button>
                 </div>
               )}
@@ -479,26 +825,40 @@ const FileManagementModal = ({
             <div className="space-y-4">
               {patientFiles.length > 0 ? (
                 <div className="space-y-2">
-                  <h4 className="font-medium text-gray-800">Patient Files:</h4>
-                  {patientFiles.map((file, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 rounded-lg bg-gray-50">
-                      <div className="flex items-center gap-3">
-                        <FileText className="w-5 h-5 text-blue-600" />
-                        <div>
-                          <p className="text-sm font-medium text-gray-800">{file.fileName}</p>
-                          <p className="text-xs text-gray-500">
-                            Uploaded {file.uploadedAt?.toDate().toLocaleDateString()}
-                          </p>
+                  <h4 className="font-medium text-gray-800">Patient Files ({patientFiles.length}):</h4>
+                  <div className="space-y-2 overflow-y-auto max-h-64">
+                    {patientFiles.map((file, index) => (
+                      <div key={index} className="flex items-center justify-between p-3 rounded-lg bg-gray-50">
+                        <div className="flex items-center gap-3">
+                          <div className="text-xl">
+                            {file.fileName.toLowerCase().includes('.pdf') ? '📄' :
+                             file.fileName.toLowerCase().match(/\.(jpg|jpeg|png|gif)$/i) ? '🖼️' :
+                             file.fileName.toLowerCase().match(/\.(mp4|mov|avi)$/i) ? '🎥' : '📁'}
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-800">{file.fileName}</p>
+                            <p className="text-xs text-gray-500">
+                              Uploaded {file.uploadedAt?.toDate?.()?.toLocaleDateString?.() || 'Recently'}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => openFileInNewTab(file.fileURL)}
+                            className="px-3 py-1 text-blue-600 bg-blue-100 rounded hover:bg-blue-200"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDownload(file.fileURL, file.fileName)}
+                            className="px-3 py-1 text-green-600 bg-green-100 rounded hover:bg-green-200"
+                          >
+                            <Download className="w-4 h-4" />
+                          </button>
                         </div>
                       </div>
-                      <button
-                        onClick={() => handleDownload(file.fileURL, file.fileName)}
-                        className="px-3 py-1 text-blue-600 bg-blue-100 rounded hover:bg-blue-200"
-                      >
-                        <Download className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               ) : (
                 <div className="py-8 text-center">
@@ -510,10 +870,58 @@ const FileManagementModal = ({
           )}
         </div>
       </div>
+
+      {/* File Preview Modal */}
+      {showPreviewModal && selectedFile && (
+        <div className="fixed inset-0 flex items-center justify-center p-4 bg-black bg-opacity-75 z-60">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
+            <div className="flex items-center justify-between p-4 border-b">
+              <h3 className="text-lg font-semibold text-gray-800">{selectedFile.fileName}</h3>
+              <button 
+                onClick={() => setShowPreviewModal(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="p-4 max-h-[70vh] overflow-auto">
+              {selectedFile.fileName.toLowerCase().match(/\.(jpg|jpeg|png|gif|bmp)$/i) ? (
+                <img 
+                  src={selectedFile.fileURL} 
+                  alt={selectedFile.fileName}
+                  className="h-auto max-w-full mx-auto"
+                />
+              ) : selectedFile.fileName.toLowerCase().match(/\.(mp4|mov|avi|wmv)$/i) ? (
+                <video 
+                  src={selectedFile.fileURL}
+                  controls
+                  className="h-auto max-w-full mx-auto"
+                />
+              ) : selectedFile.fileName.toLowerCase().includes('.pdf') ? (
+                <iframe
+                  src={selectedFile.fileURL}
+                  className="w-full h-96"
+                  title={selectedFile.fileName}
+                />
+              ) : (
+                <div className="py-12 text-center">
+                  <FileText className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+                  <p className="text-gray-600">Cannot preview this file type</p>
+                  <button
+                    onClick={() => openFileInNewTab(selectedFile.fileURL)}
+                    className="px-4 py-2 mt-4 text-blue-600 bg-blue-100 rounded-lg hover:bg-blue-200"
+                  >
+                    Open in New Tab
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
-
 // Allergies Modal Component
 const AllergiesModal = ({ 
   isOpen, 
@@ -968,6 +1376,102 @@ const PriorityDropdown = ({
   );
 };
 
+// Enhanced Triage Status Dropdown Component with Auto-Escalation
+const TriageStatusDropdown = ({ 
+  currentTriageStatus, 
+  onTriageChange, 
+  patientId,
+  patient,
+  inline = false
+}: {
+  currentTriageStatus?: string;
+  onTriageChange: (patientId: number, newStatus: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW') => void;
+  patientId: number;
+  patient: ExtendedPatient;
+  inline?: boolean;
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const statuses = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'];
+  
+  const getTriageColor = (status?: string) => {
+    switch (status) {
+      case 'CRITICAL': return 'bg-red-100 text-red-800 border-red-200 animate-pulse';
+      case 'HIGH': return 'bg-orange-100 text-orange-800 border-orange-200';
+      case 'MEDIUM': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'LOW': return 'bg-green-100 text-green-800 border-green-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
+  useEffect(() => {
+    const handleClickOutside = () => setIsOpen(false);
+    if (isOpen) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [isOpen]);
+
+  const buttonClass = inline 
+    ? `px-2 py-1 ml-1 sm:ml-2 text-xs font-medium rounded cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 border ${getTriageColor(currentTriageStatus)} inline-flex items-center gap-1 touch-manipulation`
+    : `px-2 sm:px-3 py-1 text-xs font-medium rounded-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 border ${getTriageColor(currentTriageStatus)} flex items-center gap-1 touch-manipulation`;
+
+  return (
+    <div className="relative inline-block text-left" style={{ zIndex: isOpen ? 9999 : 1 }}>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsOpen(!isOpen);
+        }}
+        className={buttonClass}
+        style={{ position: 'relative', zIndex: isOpen ? 9999 : 1 }}
+      >
+        <span className="text-[10px] sm:text-xs truncate max-w-[100px] sm:max-w-none">
+          {currentTriageStatus || 'LOW'}
+        </span>
+        <ChevronDown className="flex-shrink-0 w-3 h-3" />
+      </button>
+      
+      {isOpen && (
+        <>
+          <div 
+            className="fixed inset-0 bg-black bg-opacity-25 sm:hidden" 
+            style={{ zIndex: 9998 }} 
+            onClick={() => setIsOpen(false)} 
+          />
+          
+          <div 
+            className="absolute right-0 w-32 mt-1 overflow-y-auto bg-white border-2 border-gray-300 rounded-lg shadow-2xl sm:w-36 max-h-48"
+            style={{ 
+              zIndex: 10000,
+              position: 'absolute',
+              top: '100%',
+              right: 0,
+              transform: 'translateZ(0)'
+            }}
+          >
+            {statuses.map(status => (
+              <button
+                key={status}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onTriageChange(patientId, status as 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW');
+                  setIsOpen(false);
+                }}
+                className={`block w-full px-3 sm:px-4 py-2 sm:py-3 text-left text-xs sm:text-sm hover:bg-gray-100 transition-colors touch-manipulation ${
+                  status === currentTriageStatus ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700'
+                }`}
+                style={{ zIndex: 10001 }}
+              >
+                {status}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
 // Patient Status Dropdown Component  
 const PatientStatusDropdown = ({ 
   currentStatus, 
@@ -1063,7 +1567,7 @@ const PatientStatusDropdown = ({
   );
 };
 
-// Add/Edit Patient Modal
+// Add/Edit Patient Modal - ENHANCED WITH UNLIMITED FILE UPLOADS
 const PatientModal = ({ 
   isOpen, 
   onClose, 
@@ -1091,7 +1595,19 @@ const PatientModal = ({
     comorbidities: '',
     height: '',
     weight: '',
-    vitals: { bp: '', hr: '', temp: '', spo2: '', rr: '' },
+    vitals: { 
+      bp: '', 
+      hr: '', 
+      temp: '', 
+      spo2: '', 
+      rr: '',
+      heartRate: undefined,
+      systolicBP: undefined,
+      diastolicBP: undefined,
+      respiratoryRate: undefined,
+      oxygenSaturation: undefined,
+      temperature: undefined
+    },
     status: 'Pre-operative',
     prescriptions: [],
     investigations: [],
@@ -1104,12 +1620,17 @@ const PatientModal = ({
     scheduledTime: '',
     scheduledDate: new Date().toISOString().split('T')[0],
     selectedAllergies: [],
-    selectedComorbidities: []
+    selectedComorbidities: [],
+    triageStatus: 'LOW'
   });
 
   // Add modal states for allergies and comorbidities
   const [showAllergiesModal, setShowAllergiesModal] = useState(false);
   const [showComorbiditiesModal, setShowComorbiditiesModal] = useState(false);
+  
+  // FILE MANAGEMENT STATES FOR ADD PATIENT FORM - UNLIMITED UPLOADS
+  const [showDocumentsModal, setShowDocumentsModal] = useState(false);
+  const [showConsentModal, setShowConsentModal] = useState(false);
 
   useEffect(() => {
     if (editingPatient) {
@@ -1135,7 +1656,19 @@ const PatientModal = ({
         comorbidities: '',
         height: '',
         weight: '',
-        vitals: { bp: '', hr: '', temp: '', spo2: '', rr: '' },
+        vitals: { 
+          bp: '', 
+          hr: '', 
+          temp: '', 
+          spo2: '', 
+          rr: '',
+          heartRate: undefined,
+          systolicBP: undefined,
+          diastolicBP: undefined,
+          respiratoryRate: undefined,
+          oxygenSaturation: undefined,
+          temperature: undefined
+        },
         status: 'Pre-operative',
         prescriptions: [],
         investigations: [],
@@ -1148,7 +1681,8 @@ const PatientModal = ({
         scheduledTime: '',
         scheduledDate: new Date().toISOString().split('T')[0],
         selectedAllergies: [],
-        selectedComorbidities: []
+        selectedComorbidities: [],
+        triageStatus: 'LOW'
       });
     }
   }, [editingPatient]);
@@ -1342,7 +1876,7 @@ const PatientModal = ({
               />
             </div>
 
-            {/* Row 9: Allergies and Comorbidities - NOW WITH CLICKABLE BUTTONS */}
+            {/* Row 9: Allergies and Comorbidities - CLICKABLE BUTTONS */}
             <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2">
               <button
                 type="button"
@@ -1417,6 +1951,39 @@ const PatientModal = ({
               className="w-full h-24 p-3 text-base border border-gray-300 resize-none sm:h-32 sm:p-4 sm:text-lg rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
 
+            {/* Row 11: Enhanced File Management Buttons - UNLIMITED UPLOADS */}
+            <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2">
+              {/* Images/Videos Management - UNLIMITED UPLOADS */}
+              <button
+                type="button"
+                onClick={() => setShowDocumentsModal(true)}
+                className="w-full p-3 text-left transition-colors border-2 border-blue-300 rounded-xl bg-blue-50 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <Upload className="w-4 h-4 text-blue-600" />
+                  <label className="text-sm font-medium text-blue-700">
+                    Images/Videos
+                  </label>
+                </div>
+                <p className="text-xs text-blue-600">Upload, view & download unlimited patient media files</p>
+              </button>
+
+              {/* Documents & Consent Forms - UNLIMITED UPLOADS */}
+              <button
+                type="button"
+                onClick={() => setShowConsentModal(true)}
+                className="w-full p-3 text-left transition-colors border-2 border-green-300 rounded-xl bg-green-50 hover:bg-green-100 focus:outline-none focus:ring-2 focus:ring-green-500"
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <FileText className="w-4 h-4 text-green-600" />
+                  <label className="text-sm font-medium text-green-700">
+                    Documents & Consent Forms
+                  </label>
+                </div>
+                <p className="text-xs text-green-600">Manage unlimited PDF documents and consent forms</p>
+              </button>
+            </div>
+
             {/* Submit Buttons */}
             <div className="flex flex-col gap-3 mt-6 sm:gap-4 sm:mt-8 sm:flex-row">
               <button
@@ -1451,6 +2018,26 @@ const PatientModal = ({
             patient={formData}
             onSave={handleComorbiditiesSave}
           />
+
+          {/* Documents Management Modal - UNLIMITED UPLOADS */}
+          {showDocumentsModal && (
+            <FileManagementModal
+              isOpen={showDocumentsModal}
+              onClose={() => setShowDocumentsModal(false)}
+              patient={formData}
+              fileType="documents"
+            />
+          )}
+
+          {/* Consent Forms Management Modal - UNLIMITED UPLOADS */}
+          {showConsentModal && (
+            <FileManagementModal
+              isOpen={showConsentModal}
+              onClose={() => setShowConsentModal(false)}
+              patient={formData}
+              fileType="consent"
+            />
+          )}
         </div>
       </div>
     </div>
@@ -1467,7 +2054,10 @@ const LinearPatientCard = ({
   onDelete,
   onEditPatient,
   onOpenNotesModal,
-  onUpdatePatient
+  onUpdatePatient,
+  onManageDocuments,
+  onManageConsent,
+  onTriageChange
 }: {
   patient: ExtendedPatient;
   index: number;
@@ -1478,6 +2068,9 @@ const LinearPatientCard = ({
   onEditPatient: (patient: ExtendedPatient) => void;
   onOpenNotesModal: (patient: ExtendedPatient) => void;
   onUpdatePatient: (patientId: number, updates: Partial<ExtendedPatient>) => void;
+  onManageDocuments: (patient: ExtendedPatient) => void;
+  onManageConsent: (patient: ExtendedPatient) => void;
+  onTriageChange: (patientId: number, newStatus: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW') => void;
 }) => {
   // Get priority color for the left border and background
   const getPriorityStyles = (priority: string) => {
@@ -1526,6 +2119,12 @@ const LinearPatientCard = ({
         </div>
         
         <div className="flex items-center gap-2">
+          <TriageStatusDropdown
+            currentTriageStatus={patient.triageStatus}
+            onTriageChange={onTriageChange}
+            patientId={patient.id}
+            patient={patient}
+          />
           <PriorityDropdown
             currentStatus={patient.priority}
             onStatusChange={onStatusChange}
@@ -1548,6 +2147,9 @@ const LinearPatientCard = ({
             onEditPatient={onEditPatient}
             onOpenNotesModal={onOpenNotesModal}
             onUpdatePatient={onUpdatePatient}
+            onManageDocuments={onManageDocuments}
+            onManageConsent={onManageConsent}
+            onTriageChange={onTriageChange}
           />
         </div>
       )}
@@ -1555,7 +2157,7 @@ const LinearPatientCard = ({
   );
 };
 
-// Patient Detail Card Component
+// Enhanced Patient Detail Card Component with Vitals Auto-Escalation
 const PatientDetailCard = ({ 
   patient, 
   onStatusChange, 
@@ -1564,7 +2166,10 @@ const PatientDetailCard = ({
   onEditPatient,
   onOpenNotesModal,
   onUpdatePatient,
-  highlightRef 
+  highlightRef,
+  onManageDocuments,
+  onManageConsent,
+  onTriageChange
 }: {
   patient: ExtendedPatient;
   onStatusChange: (patientId: number, newStatus: string) => void;
@@ -1574,6 +2179,9 @@ const PatientDetailCard = ({
   onOpenNotesModal: (patient: ExtendedPatient) => void;
   onUpdatePatient: (patientId: number, updates: Partial<ExtendedPatient>) => void;
   highlightRef?: React.RefObject<HTMLDivElement | null>;
+  onManageDocuments: (patient: ExtendedPatient) => void;
+  onManageConsent: (patient: ExtendedPatient) => void;
+  onTriageChange: (patientId: number, newStatus: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW') => void;
 }) => {
   // Navigation and context hooks
   const navigate = useNavigate();
@@ -1608,14 +2216,49 @@ const PatientDetailCard = ({
   const [operationsForm, setOperationsForm] = useState(patient.operation || '');
   const [heightForm, setHeightForm] = useState(patient.height || '');
   const [weightForm, setWeightForm] = useState(patient.weight || '');
-  const [vitalsForm, setVitalsForm] = useState(patient.vitals || { bp: '', hr: '', temp: '', spo2: '', rr: '' });
+  const [vitalsForm, setVitalsForm] = useState(patient.vitals || { 
+    bp: '', hr: '', temp: '', spo2: '', rr: '',
+    heartRate: undefined,
+    systolicBP: undefined,
+    diastolicBP: undefined,
+    respiratoryRate: undefined,
+    oxygenSaturation: undefined,
+    temperature: undefined
+  });
   const [newPrescription, setNewPrescription] = useState('');
   const [newInvestigation, setNewInvestigation] = useState({ type: '', date: '', status: 'Pending' });
 
-  // NEW HANDLER FUNCTIONS FOR CONNECTED BUTTONS:
+  // Auto-escalation effect for vitals monitoring
+  useEffect(() => {
+    if (patient.vitals) {
+      const evaluation = evaluateVitals(patient.vitals);
+      
+      // Update triage status if it has changed
+      if (evaluation.triageStatus !== patient.triageStatus) {
+        onTriageChange(patient.id, evaluation.triageStatus);
+        
+        // Generate notification for critical/high status
+        if (['CRITICAL', 'HIGH'].includes(evaluation.triageStatus)) {
+          try {
+            addNotification({
+              userId: 'current-user-id',
+              title: `🚨 ${evaluation.triageStatus} Alert - ${patient.name}`,
+              body: `Patient vitals indicate ${evaluation.triageStatus.toLowerCase()} condition. Abnormal vitals: ${evaluation.abnormalVitals.join(', ')}`
+            }, {
+              metaType: 'vitals-alert',
+              role: 'healthcare-provider'
+            }).catch(console.error);
+          } catch (error) {
+            console.error('Failed to send notification:', error);
+          }
+        }
+      }
+    }
+  }, [patient.vitals, patient.triageStatus, patient.id, patient.name, onTriageChange]);
+
+  // CONNECTED BUTTON HANDLERS:
 
   const handleOrderBloods = (patient: ExtendedPatient) => {
-    // Set selected patient in context
     setPatient({
       id: patient.id.toString(),
       name: patient.name,
@@ -1626,10 +2269,7 @@ const PatientDetailCard = ({
       diagnosis: patient.diagnosis
     });
     
-    // Set pending action to auto-trigger form
     setPendingAction('order-bloods');
-    
-    // Navigate to diagnostics page
     navigate('/diagnostics');
   };
 
@@ -1695,6 +2335,23 @@ const PatientDetailCard = ({
   };
 
   const saveVitals = () => {
+    // Parse BP values
+    if (vitalsForm.bp) {
+      const bpParts = vitalsForm.bp.split('/');
+      if (bpParts.length === 2) {
+        vitalsForm.systolicBP = parseInt(bpParts[0]);
+        vitalsForm.diastolicBP = parseInt(bpParts[1]);
+      }
+    }
+
+    // Parse other vitals
+    if (vitalsForm.hr) vitalsForm.heartRate = parseInt(vitalsForm.hr);
+    if (vitalsForm.rr) vitalsForm.respiratoryRate = parseInt(vitalsForm.rr);
+    if (vitalsForm.spo2) vitalsForm.oxygenSaturation = parseInt(vitalsForm.spo2.replace('%', ''));
+    if (vitalsForm.temp) vitalsForm.temperature = parseFloat(vitalsForm.temp.replace('°C', ''));
+
+    vitalsForm.lastUpdated = new Date().toISOString();
+
     onUpdatePatient(patient.id, { vitals: vitalsForm });
     setEditingVitals(false);
   };
@@ -1763,17 +2420,20 @@ const PatientDetailCard = ({
   return (
     <div 
       ref={highlightRef}
-      className={`bg-white rounded-lg shadow-lg border-l-4 ${getStatusBorderColor(patient.priority)} overflow-hidden`}
+      className={`bg-white rounded-lg shadow-lg border-l-4 ${getTriageBorderColor(patient.triageStatus)} overflow-hidden`}
     >
       <div className="p-3 sm:p-4 lg:p-6">
-        {/* Header - Updated with Medical Aid Info */}
+        {/* Header - REMOVED TriageStatusDropdown from next to patient name */}
         <div className="flex flex-col items-start justify-between gap-3 mb-4 sm:flex-row sm:gap-4">
           <div className="flex items-center flex-1 gap-3">
             <div className="flex items-center justify-center flex-shrink-0 w-10 h-10 bg-gray-100 rounded-full sm:w-12 sm:h-12">
               <User className="w-5 h-5 text-gray-600 sm:w-6 sm:h-6" />
             </div>
             <div className="flex-1 min-w-0">
-              <h3 className="text-base font-bold text-gray-800 truncate sm:text-lg">{patient.name}</h3>
+              <div className="flex items-center gap-2 mb-1">
+                <h3 className="text-base font-bold text-gray-800 truncate sm:text-lg">{patient.name}</h3>
+                {/* REMOVED: TriageStatusDropdown from here per instructions */}
+              </div>
               <p className="text-sm text-gray-600">{patient.age} yrs, {patient.gender}</p>
               {editingBasicInfo ? (
                 <div className="mt-2 space-y-2">
@@ -1889,6 +2549,9 @@ const PatientDetailCard = ({
               ) : (
                 <div className="mt-3 space-y-2 text-sm">
                   <div>
+                    <span className="font-medium">Hospital:</span> {patient.hospital}
+                  </div>
+                  <div>
                     <span className="font-medium">Diagnosis:</span>{' '}
                     <span className="text-red-600">{patient.diagnosis}</span>
                   </div>
@@ -1903,9 +2566,6 @@ const PatientDetailCard = ({
                   </div>
                   <div>
                     <span className="font-medium">Ward:</span> {patient.ward}
-                  </div>
-                  <div>
-                    <span className="font-medium">Hospital:</span> {patient.hospital}
                   </div>
                 </div>
               )}
@@ -2010,7 +2670,7 @@ const PatientDetailCard = ({
             </div>
           </div>
 
-          {/* Center Column - Operation, Allergies, Comorbidities, Vitals */}
+          {/* Center Column - Operation, Allergies, Comorbidities, Enhanced Vitals */}
           <div className="space-y-4">
             <div>
               <div className="flex items-center justify-between mb-2">
@@ -2046,7 +2706,7 @@ const PatientDetailCard = ({
               )}
             </div>
 
-            {/* NEW: Structured Allergies Section */}
+            {/* Structured Allergies Section */}
             <div>
               <div className="flex items-center justify-between mb-2">
                 <h4 className="font-semibold text-gray-800">Allergies:</h4>
@@ -2078,7 +2738,7 @@ const PatientDetailCard = ({
               </div>
             </div>
 
-            {/* NEW: Structured Comorbidities Section */}
+            {/* Structured Comorbidities Section */}
             <div>
               <div className="flex items-center justify-between mb-2">
                 <h4 className="font-semibold text-gray-800">Comorbidities:</h4>
@@ -2110,10 +2770,10 @@ const PatientDetailCard = ({
               </div>
             </div>
 
-            {/* Vitals */}
+            {/* Enhanced Vitals with Auto-Escalation Styling */}
             <div>
               <div className="flex items-center justify-between mb-2">
-                <h4 className="font-semibold text-gray-800">Vitals</h4>
+                <h4 className="font-semibold text-gray-800">Real-time Vitals</h4>
                 {!editingVitals && (
                   <button 
                     onClick={() => setEditingVitals(true)}
@@ -2130,41 +2790,41 @@ const PatientDetailCard = ({
                       type="text"
                       value={vitalsForm.bp}
                       onChange={(e) => setVitalsForm(prev => ({ ...prev, bp: e.target.value }))}
-                      placeholder="BP"
+                      placeholder="BP (e.g., 120/80)"
                       className="p-2 text-xs border border-gray-300 rounded"
                     />
                     <input
                       type="text"
                       value={vitalsForm.hr}
                       onChange={(e) => setVitalsForm(prev => ({ ...prev, hr: e.target.value }))}
-                      placeholder="HR"
+                      placeholder="HR (e.g., 72)"
                       className="p-2 text-xs border border-gray-300 rounded"
                     />
                     <input
                       type="text"
                       value={vitalsForm.temp}
                       onChange={(e) => setVitalsForm(prev => ({ ...prev, temp: e.target.value }))}
-                      placeholder="TEMP"
+                      placeholder="TEMP (e.g., 36.8°C)"
                       className="p-2 text-xs border border-gray-300 rounded"
                     />
                     <input
                       type="text"
                       value={vitalsForm.spo2}
                       onChange={(e) => setVitalsForm(prev => ({ ...prev, spo2: e.target.value }))}
-                      placeholder="SPO2"
+                      placeholder="SPO2 (e.g., 98%)"
                       className="p-2 text-xs border border-gray-300 rounded"
                     />
                     <input
                       type="text"
                       value={vitalsForm.rr}
                       onChange={(e) => setVitalsForm(prev => ({ ...prev, rr: e.target.value }))}
-                      placeholder="RR"
+                      placeholder="RR (e.g., 16)"
                       className="col-span-2 p-2 text-xs border border-gray-300 rounded"
                     />
                   </div>
                   <div className="flex gap-2">
                     <button onClick={saveVitals} className="px-2 py-1 text-xs text-white bg-green-600 rounded hover:bg-green-700">
-                      Save
+                      Save & Auto-Assess
                     </button>
                     <button onClick={() => setEditingVitals(false)} className="px-2 py-1 text-xs text-white bg-gray-600 rounded hover:bg-gray-700">
                       Cancel
@@ -2173,26 +2833,61 @@ const PatientDetailCard = ({
                 </div>
               ) : (
                 <div className="grid grid-cols-2 gap-2 mt-3">
-                  <div className="p-3 text-center bg-red-100 rounded-lg">
-                    <div className="text-xs font-medium text-gray-600">BP</div>
-                    <div className="text-lg font-bold text-red-700">{patient.vitals?.bp || '85/50'}</div>
+                  <div className={`p-3 text-center rounded-lg border-2 ${getVitalColor(getVitalStatus('systolicBP', patient.vitals?.systolicBP))}`}>
+                    <div className="flex items-center justify-center gap-1 mb-1">
+                      <Heart className="w-3 h-3" />
+                      <div className="text-xs font-medium text-gray-600">BP</div>
+                    </div>
+                    <div className="text-lg font-bold">{patient.vitals?.bp || '85/50'}</div>
+                    {getVitalStatus('systolicBP', patient.vitals?.systolicBP) === 'abnormal' && (
+                      <div className="text-xs font-medium text-red-600">⚠️ ABNORMAL</div>
+                    )}
                   </div>
-                  <div className="p-3 text-center bg-orange-100 rounded-lg">
-                    <div className="text-xs font-medium text-gray-600">HR</div>
-                    <div className="text-lg font-bold text-orange-700">{patient.vitals?.hr || '110'}</div>
+                  <div className={`p-3 text-center rounded-lg border-2 ${getVitalColor(getVitalStatus('heartRate', patient.vitals?.heartRate))}`}>
+                    <div className="flex items-center justify-center gap-1 mb-1">
+                      <Activity className="w-3 h-3" />
+                      <div className="text-xs font-medium text-gray-600">HR</div>
+                    </div>
+                    <div className="text-lg font-bold">{patient.vitals?.hr || '110'}</div>
+                    {getVitalStatus('heartRate', patient.vitals?.heartRate) === 'abnormal' && (
+                      <div className="text-xs font-medium text-red-600">⚠️ ABNORMAL</div>
+                    )}
                   </div>
-                  <div className="p-3 text-center bg-yellow-100 rounded-lg">
-                    <div className="text-xs font-medium text-gray-600">TEMP</div>
-                    <div className="text-lg font-bold text-yellow-700">{patient.vitals?.temp || '38.5°C'}</div>
+                  <div className={`p-3 text-center rounded-lg border-2 ${getVitalColor(getVitalStatus('temperature', patient.vitals?.temperature))}`}>
+                    <div className="flex items-center justify-center gap-1 mb-1">
+                      <Thermometer className="w-3 h-3" />
+                      <div className="text-xs font-medium text-gray-600">TEMP</div>
+                    </div>
+                    <div className="text-lg font-bold">{patient.vitals?.temp || '38.5°C'}</div>
+                    {getVitalStatus('temperature', patient.vitals?.temperature) === 'abnormal' && (
+                      <div className="text-xs font-medium text-red-600">⚠️ ABNORMAL</div>
+                    )}
                   </div>
-                  <div className="p-3 text-center bg-pink-100 rounded-lg">
-                    <div className="text-xs font-medium text-gray-600">SPO2</div>
-                    <div className="text-lg font-bold text-pink-700">{patient.vitals?.spo2 || '92%'}</div>
+                  <div className={`p-3 text-center rounded-lg border-2 ${getVitalColor(getVitalStatus('oxygenSaturation', patient.vitals?.oxygenSaturation))}`}>
+                    <div className="flex items-center justify-center gap-1 mb-1">
+                      <Zap className="w-3 h-3" />
+                      <div className="text-xs font-medium text-gray-600">SPO2</div>
+                    </div>
+                    <div className="text-lg font-bold">{patient.vitals?.spo2 || '92%'}</div>
+                    {getVitalStatus('oxygenSaturation', patient.vitals?.oxygenSaturation) === 'abnormal' && (
+                      <div className="text-xs font-medium text-red-600">⚠️ ABNORMAL</div>
+                    )}
                   </div>
-                  <div className="col-span-2 p-3 text-center bg-green-100 rounded-lg">
-                    <div className="text-xs font-medium text-gray-600">RR</div>
-                    <div className="text-lg font-bold text-green-700">{patient.vitals?.rr || '24'}</div>
+                  <div className={`col-span-2 p-3 text-center rounded-lg border-2 ${getVitalColor(getVitalStatus('respiratoryRate', patient.vitals?.respiratoryRate))}`}>
+                    <div className="flex items-center justify-center gap-1 mb-1">
+                      <Activity className="w-3 h-3" />
+                      <div className="text-xs font-medium text-gray-600">RR</div>
+                    </div>
+                    <div className="text-lg font-bold">{patient.vitals?.rr || '24'}</div>
+                    {getVitalStatus('respiratoryRate', patient.vitals?.respiratoryRate) === 'abnormal' && (
+                      <div className="text-xs font-medium text-red-600">⚠️ ABNORMAL</div>
+                    )}
                   </div>
+                </div>
+              )}
+              {patient.vitals?.lastUpdated && (
+                <div className="mt-2 text-xs text-center text-gray-500">
+                  Last updated: {new Date(patient.vitals.lastUpdated).toLocaleString()}
                 </div>
               )}
             </div>
@@ -2306,15 +3001,21 @@ const PatientDetailCard = ({
                   </button>
                 </div>
 
-                {/* Row 3: Upload & Download Patient Media - FILE MANAGEMENT BUTTONS */}
+                {/* Row 3: Enhanced File Management Buttons - UNLIMITED UPLOADS */}
                 <div className="grid grid-cols-2 gap-2">
-                  <button className="flex items-center gap-2 px-3 py-2 text-sm text-blue-600 bg-blue-100 rounded-lg hover:bg-blue-200">
+                  <button 
+                    onClick={() => onManageDocuments(patient)}
+                    className="flex items-center gap-2 px-3 py-2 text-sm text-blue-600 bg-blue-100 rounded-lg hover:bg-blue-200"
+                  >
                     <Upload className="w-4 h-4" />
-                    <span className="text-xs">Upload Patient Pictures/<br />Videos/Documents</span>
+                    <span className="text-xs">Images/Videos</span>
                   </button>
-                  <button className="flex items-center gap-2 px-3 py-2 text-sm text-teal-600 bg-teal-100 rounded-lg hover:bg-teal-200">
-                    <Download className="w-4 h-4" />
-                    <span className="text-xs">Download Patient Pictures/<br />Videos/Documents</span>
+                  <button 
+                    onClick={() => onManageConsent(patient)}
+                    className="flex items-center gap-2 px-3 py-2 text-sm text-green-600 bg-green-100 rounded-lg hover:bg-green-200"
+                  >
+                    <FileText className="w-4 h-4" />
+                    <span className="text-xs">Documents & Consent Forms</span>
                   </button>
                 </div>
 
@@ -2494,18 +3195,31 @@ const PatientDetailCard = ({
   );
 };
 
-// Load patients from storage (in-memory for demo)
-const loadPatientsFromStorage = (): ExtendedPatient[] => {
+// Load patients from storage with LocalForage fallback
+const loadPatientsFromStorage = async (): Promise<ExtendedPatient[]> => {
+  try {
+    const storedPatients = await localforage.getItem<ExtendedPatient[]>('patients_data');
+    if (storedPatients && Array.isArray(storedPatients)) {
+      return storedPatients;
+    }
+  } catch (error) {
+    console.warn('Failed to load from LocalForage:', error);
+  }
+  
   return initialPatients;
 };
 
-// Save patients to storage (in-memory for demo)
-const savePatientsToStorage = (patients: ExtendedPatient[]) => {
-  // In a real app, this would save to localStorage or backend
-  console.log('Saving patients:', patients);
+// Save patients to storage with LocalForage
+const savePatientsToStorage = async (patients: ExtendedPatient[]) => {
+  try {
+    await localforage.setItem('patients_data', patients);
+    console.log('Patients saved to LocalForage');
+  } catch (error) {
+    console.error('Failed to save to LocalForage:', error);
+  }
 };
 
-// Main Component
+// Enhanced Main Component with Vitals-to-Triage Auto-Escalation
 const Patients: React.FC = () => {
   // Navigation and context hooks
   const navigate = useNavigate();
@@ -2520,7 +3234,7 @@ const Patients: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [showAddPatient, setShowAddPatient] = useState<boolean>(false);
   const [highlightPatient, setHighlightPatient] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'list' | 'detailed'>('detailed');
+  const [viewMode, setViewMode] = useState<'list' | 'detailed'>('list');
   const [selectedPatient, setSelectedPatient] = useState<ExtendedPatient | null>(null);
   const [editingPatient, setEditingPatient] = useState<ExtendedPatient | null>(null);
   const [showNotesModal, setShowNotesModal] = useState<boolean>(false);
@@ -2528,14 +3242,18 @@ const Patients: React.FC = () => {
   const [newNote, setNewNote] = useState<string>('');
   const [expandedPatients, setExpandedPatients] = useState<Set<number>>(new Set());
 
-  // NEW FILE MANAGEMENT STATE
+  // FILE MANAGEMENT STATE
   const [showFileModal, setShowFileModal] = useState(false);
   const [currentPatientForFiles, setCurrentPatientForFiles] = useState<ExtendedPatient | null>(null);
+  const [currentFileType, setCurrentFileType] = useState<'documents' | 'consent'>('documents');
 
   // Load patients from storage on component mount
   useEffect(() => {
-    const savedPatients = loadPatientsFromStorage();
-    setPatients(savedPatients);
+    const loadInitialData = async () => {
+      const savedPatients = await loadPatientsFromStorage();
+      setPatients(savedPatients);
+    };
+    loadInitialData();
   }, []);
 
   // Save patients to storage whenever patients change
@@ -2545,10 +3263,51 @@ const Patients: React.FC = () => {
     }
   }, [patients]);
 
-  // NEW HANDLER FUNCTIONS FOR CONNECTED BUTTONS:
+  // Real-time vitals monitoring and auto-escalation
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      setPatients(prevPatients => {
+        return prevPatients.map(patient => {
+          if (patient.vitals && patient.vitals.lastUpdated) {
+            const evaluation = evaluateVitals(patient.vitals);
+            
+            // Auto-update triage status if needed
+            if (evaluation.triageStatus !== patient.triageStatus) {
+              // Generate critical alert if needed
+              if (['CRITICAL', 'HIGH'].includes(evaluation.triageStatus)) {
+                try {
+                  addNotification({
+                    userId: 'current-user-id',
+                    title: `🚨 Auto-Escalated: ${patient.name}`,
+                    body: `Vitals indicate ${evaluation.triageStatus.toLowerCase()} condition. Abnormal: ${evaluation.abnormalVitals.join(', ')}`
+                  }, {
+                    metaType: 'auto-escalation',
+                    role: 'healthcare-provider'
+                  }).catch(console.error);
+                } catch (error) {
+                  console.error('Failed to send notification:', error);
+                }
+              }
+
+              return {
+                ...patient,
+                triageStatus: evaluation.triageStatus,
+                abnormalVitals: evaluation.abnormalVitals,
+                lastTriageUpdate: new Date().toISOString()
+              };
+            }
+          }
+          return patient;
+        });
+      });
+    }, 30000); // Check every 30 seconds
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // CONNECTED BUTTON HANDLERS:
 
   const handleOrderBloods = (patient: ExtendedPatient) => {
-    // Set selected patient in context
     setPatient({
       id: patient.id.toString(),
       name: patient.name,
@@ -2559,10 +3318,7 @@ const Patients: React.FC = () => {
       diagnosis: patient.diagnosis
     });
     
-    // Set pending action to auto-trigger form
     setPendingAction('order-bloods');
-    
-    // Navigate to diagnostics page
     navigate('/diagnostics');
   };
 
@@ -2596,13 +3352,15 @@ const Patients: React.FC = () => {
     navigate('/diagnostics');
   };
 
-  const handleUploadDocuments = (patient: ExtendedPatient) => {
+  const handleManageDocuments = (patient: ExtendedPatient) => {
     setCurrentPatientForFiles(patient);
+    setCurrentFileType('documents');
     setShowFileModal(true);
   };
 
-  const handleDownloadDocuments = (patient: ExtendedPatient) => {
+  const handleManageConsent = (patient: ExtendedPatient) => {
     setCurrentPatientForFiles(patient);
+    setCurrentFileType('consent');
     setShowFileModal(true);
   };
 
@@ -2635,6 +3393,36 @@ const Patients: React.FC = () => {
     setPatients(updatedPatients);
   };
 
+  const updatePatientTriageStatus = (patientId: number, newTriageStatus: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW') => {
+    const updatedPatients = patients.map(p => 
+      p.id === patientId ? { 
+        ...p, 
+        triageStatus: newTriageStatus,
+        lastTriageUpdate: new Date().toISOString()
+      } : p
+    );
+    setPatients(updatedPatients);
+
+    // Generate notification for manual triage changes
+    if (['CRITICAL', 'HIGH'].includes(newTriageStatus)) {
+      const patient = patients.find(p => p.id === patientId);
+      if (patient) {
+        try {
+          addNotification({
+            userId: 'current-user-id',
+            title: `🏥 Triage Updated: ${patient.name}`,
+            body: `Patient triage status manually updated to ${newTriageStatus.toLowerCase()}`
+          }, {
+            metaType: 'triage-update',
+            role: 'healthcare-provider'
+          }).catch(console.error);
+        } catch (error) {
+          console.error('Failed to send notification:', error);
+        }
+      }
+    }
+  };
+
   const updatePatient = (patientId: number, updates: Partial<ExtendedPatient>) => {
     const updatedPatients = patients.map(p => 
       p.id === patientId ? { ...p, ...updates } : p
@@ -2645,7 +3433,9 @@ const Patients: React.FC = () => {
   const addNewPatient = (patientData: any) => {
     const newPatient: ExtendedPatient = {
       ...patientData,
-      id: Math.max(...patients.map(p => p.id), 0) + 1
+      id: Math.max(...patients.map(p => p.id), 0) + 1,
+      triageStatus: 'LOW',
+      lastTriageUpdate: new Date().toISOString()
     };
     setPatients([...patients, newPatient]);
   };
@@ -2718,11 +3508,16 @@ const Patients: React.FC = () => {
     p.mrn.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Real-time sorting functionality
+  // Enhanced sorting with triage priority
   const sorted = [...filtered].sort((a, b) => {
     let valA: any, valB: any;
     
     switch (sortBy) {
+      case 'triage':
+        const triageOrder = { 'CRITICAL': 1, 'HIGH': 2, 'MEDIUM': 3, 'LOW': 4 };
+        valA = triageOrder[a.triageStatus as keyof typeof triageOrder] || 5;
+        valB = triageOrder[b.triageStatus as keyof typeof triageOrder] || 5;
+        break;
       case 'priority':
         const priorityOrder = { 'critical': 1, 'high': 2, 'medium': 3, 'low': 4, 'stable': 5 };
         valA = priorityOrder[a.priority as keyof typeof priorityOrder] || 6;
@@ -2784,6 +3579,7 @@ const Patients: React.FC = () => {
             className="flex-1 text-xs text-purple-600 bg-transparent outline-none sm:text-sm"
           >
             <option value="name">Sort by Name</option>
+            <option value="triage">Sort by Triage</option>
             <option value="priority">Sort by Priority</option>
             <option value="admissionDate">Sort by Admission Date</option>
             <option value="diagnosis">Sort by Diagnosis</option>
@@ -2842,6 +3638,9 @@ const Patients: React.FC = () => {
                 onOpenNotesModal={openNotesModal}
                 onUpdatePatient={updatePatient}
                 highlightRef={highlightPatient === patient.name ? highlightRef : undefined}
+                onManageDocuments={handleManageDocuments}
+                onManageConsent={handleManageConsent}
+                onTriageChange={updatePatientTriageStatus}
               />
             ))}
           </div>
@@ -2857,7 +3656,7 @@ const Patients: React.FC = () => {
               <span className="min-w-[100px]">Comorbidities</span>
               <span className="min-w-[120px]">Allergies</span>
               <span className="min-w-[100px]">Contact</span>
-              <span className="ml-auto">Priority</span>
+              <span className="ml-auto">Triage/Priority</span>
             </div>
             
             {sorted.map((patient, index) => (
@@ -2872,6 +3671,9 @@ const Patients: React.FC = () => {
                 onEditPatient={handleEditPatient}
                 onOpenNotesModal={openNotesModal}
                 onUpdatePatient={updatePatient}
+                onManageDocuments={handleManageDocuments}
+                onManageConsent={handleManageConsent}
+                onTriageChange={updatePatientTriageStatus}
               />
             ))}
           </div>
@@ -3044,17 +3846,8 @@ const Patients: React.FC = () => {
                         <span className="text-gray-800">None reported</span>
                       )}
                     </div>
-                    <div>
-                      <span className="block mb-1 text-sm font-medium text-gray-600">Medical Aid Name</span>
-                      <span className="text-gray-800">{selectedPatient.medicalAidName || 'Not provided'}</span>
-                    </div>
-                    <div>
-                      <span className="block mb-1 text-sm font-medium text-gray-600">Medical Aid Number</span>
-                      <span className="text-gray-800">{selectedPatient.medicalAidNumber || 'Not provided'}</span>
-                    </div>
                   </div>
                 </div>
-                
                 <div className="space-y-4">
                   <h4 className="font-semibold text-gray-800">Medical Details</h4>
                   <div className="space-y-3">
@@ -3062,6 +3855,12 @@ const Patients: React.FC = () => {
                       <span className="block mb-1 text-sm font-medium text-gray-600">Priority</span>
                       <span className={`inline-block px-2 py-1 text-xs rounded-full ${getStatusColor(selectedPatient.priority)}`}>
                         {selectedPatient.priority}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="block mb-1 text-sm font-medium text-gray-600">Triage Status</span>
+                      <span className={`inline-block px-2 py-1 text-xs rounded-full ${getTriageColor(selectedPatient.triageStatus)}`}>
+                        {selectedPatient.triageStatus || 'LOW'}
                       </span>
                     </div>
                     <div>
@@ -3090,6 +3889,42 @@ const Patients: React.FC = () => {
                       <span className="block mb-1 text-sm font-medium text-gray-600">Room</span>
                       <span className="text-gray-800">{selectedPatient.room || 'Not assigned'}</span>
                     </div>
+                    
+                    {/* Enhanced Vitals Display */}
+                    <div>
+                      <span className="block mb-2 text-sm font-medium text-gray-600">Current Vitals</span>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className={`p-2 text-center rounded ${getVitalColor(getVitalStatus('systolicBP', selectedPatient.vitals?.systolicBP))}`}>
+                          <div className="text-xs font-medium">BP</div>
+                          <div className="text-sm font-bold">{selectedPatient.vitals?.bp || '85/50'}</div>
+                        </div>
+                        <div className={`p-2 text-center rounded ${getVitalColor(getVitalStatus('heartRate', selectedPatient.vitals?.heartRate))}`}>
+                          <div className="text-xs font-medium">HR</div>
+                          <div className="text-sm font-bold">{selectedPatient.vitals?.hr || '110'}</div>
+                        </div>
+                        <div className={`p-2 text-center rounded ${getVitalColor(getVitalStatus('temperature', selectedPatient.vitals?.temperature))}`}>
+                          <div className="text-xs font-medium">TEMP</div>
+                          <div className="text-sm font-bold">{selectedPatient.vitals?.temp || '38.5°C'}</div>
+                        </div>
+                        <div className={`p-2 text-center rounded ${getVitalColor(getVitalStatus('oxygenSaturation', selectedPatient.vitals?.oxygenSaturation))}`}>
+                          <div className="text-xs font-medium">SPO2</div>
+                          <div className="text-sm font-bold">{selectedPatient.vitals?.spo2 || '92%'}</div>
+                        </div>
+                      </div>
+                      
+                      {/* Abnormal Vitals Alert */}
+                      {selectedPatient.abnormalVitals && selectedPatient.abnormalVitals.length > 0 && (
+                        <div className="p-2 mt-2 bg-red-100 border border-red-200 rounded">
+                          <div className="flex items-center gap-1">
+                            <AlertTriangle className="w-4 h-4 text-red-600" />
+                            <span className="text-xs font-medium text-red-700">Abnormal Vitals Detected:</span>
+                          </div>
+                          <div className="mt-1 text-xs text-red-600">
+                            {selectedPatient.abnormalVitals.join(', ')}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -3099,7 +3934,7 @@ const Patients: React.FC = () => {
                   <h4 className="pb-2 mb-3 font-semibold text-gray-800">Latest Notes</h4>
                   <div className="p-4 border border-gray-200 rounded-lg bg-gray-50">
                     {selectedPatient.notes.map((note: string, index: number) => (
-                      <p key={index} className="text-gray-800">• {note}</p>
+                      <p key={index} className="mb-1 text-gray-800">• {note}</p>
                     ))}
                   </div>
                 </div>
@@ -3137,6 +3972,7 @@ const Patients: React.FC = () => {
             setCurrentPatientForFiles(null);
           }}
           patient={currentPatientForFiles}
+          fileType={currentFileType}
         />
       )}
     </div>

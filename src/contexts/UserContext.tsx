@@ -20,6 +20,7 @@ interface UserContextType {
   setUserId: (id: string) => void;
   users: User[];
   user: User;
+  businessId: string; // Added businessId
 }
 
 export const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -30,7 +31,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const currentUser = users.find((u) => u.id === userId) || users[0];
 
   return (
-    <UserContext.Provider value={{ userId, setUserId, users, user: currentUser }}>
+    <UserContext.Provider value={{ userId, setUserId, users, user: currentUser, businessId: "defaultBusinessId" }}>
       {children}
     </UserContext.Provider>
   );

@@ -15,6 +15,7 @@ const NotificationBell: React.FC = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Load cached notifications on mount
   useEffect(() => {
     if (!userId) return;
     const key = LOCAL_KEY_PREFIX + userId;
@@ -27,12 +28,15 @@ const NotificationBell: React.FC = () => {
     });
   }, [userId]);
 
+  // Fetch fresh notifications when bell is opened or periodically
   useEffect(() => {
     if (!userId) return;
-    setLoading(true);
-    const key = LOCAL_KEY_PREFIX + userId;
-    getUserNotifications(userId)
-      .then((notifs) => {
+    
+    const fetchNotifications = async () => {
+      setLoading(true);
+      const key = LOCAL_KEY_PREFIX + userId;
+      try {
+        const notifs = await getUserNotifications(userId);
         const mapped = notifs.map((n) => ({
           id: n.id,
           userId: n.userId ?? userId,
@@ -40,45 +44,93 @@ const NotificationBell: React.FC = () => {
           body: n.body ?? "",
           read: n.read ?? false,
           createdAt: n.createdAt ?? null,
+          metaType: n.metaType,
+          role: n.role,
+          expiryDate: n.expiryDate,
         }));
+        
+        // Sort by creation date (newest first)
+        mapped.sort((a, b) => {
+          const timeA = a.createdAt?.seconds || 0;
+          const timeB = b.createdAt?.seconds || 0;
+          return timeB - timeA;
+        });
+        
         setNotifications(mapped);
         setUnreadCount(mapped.filter((n) => !n.read).length);
-        localforage.setItem(key, mapped);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+        await localforage.setItem(key, mapped);
+      } catch (error) {
+        console.error('Failed to fetch notifications:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    // Fetch immediately when opened
+    if (open) {
+      fetchNotifications();
+    }
+
+    // Set up periodic refresh every 30 seconds for real-time updates
+    const interval = setInterval(fetchNotifications, 30000);
+    
+    return () => clearInterval(interval);
   }, [userId, open]);
 
+  // Handle notification updates from NotificationList
+  const handleNotificationUpdate = (updatedNotifications: Notification[]) => {
+    const updatedWithUserId = updatedNotifications.map((n) => ({ ...n, userId }));
+    setNotifications(updatedWithUserId);
+    setUnreadCount(updatedWithUserId.filter((n) => !n.read).length);
+    
+    // Update cache
+    const key = LOCAL_KEY_PREFIX + userId;
+    localforage.setItem(key, updatedWithUserId);
+  };
+
+  // Enhanced notification bell with better visual feedback
   return (
     <div className="relative">
       <button
-        className="relative p-2 transition rounded-full hover:bg-brown-100"
+        className={`relative p-2 transition-all duration-200 rounded-full hover:bg-brown-100 ${
+          unreadCount > 0 ? 'animate-pulse' : ''
+        }`}
         onClick={() => setOpen((o) => !o)}
+        title={`${unreadCount} unread notifications`}
       >
-        <Bell className="w-6 h-6" />
+        <Bell className={`w-6 h-6 ${unreadCount > 0 ? 'text-red-600' : 'text-gray-600'}`} />
         {unreadCount > 0 && (
-          <span className="absolute flex items-center justify-center w-5 h-5 text-xs text-white bg-red-500 rounded-full -top-1 -right-1">
-            {unreadCount}
+          <span className="absolute flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-red-500 rounded-full animate-bounce -top-1 -right-1">
+            {unreadCount > 99 ? '99+' : unreadCount}
           </span>
         )}
       </button>
+      
       {open && (
-        <div className="absolute right-0 z-50 mt-2 bg-white shadow-2xl w-80 max-h-96 rounded-2xl">
-          {loading ? (
-            <div className="p-6 text-center text-gray-400">Loading notifications...</div>
-          ) : (
-            <NotificationList
-              notifications={notifications}
-              userId={userId}
-              onUpdate={(updated) => {
-                const updatedWithUserId = updated.map((n) => ({ ...n, userId }));
-                setNotifications(updatedWithUserId);
-                localforage.setItem(LOCAL_KEY_PREFIX + userId, updatedWithUserId);
-                setUnreadCount(updatedWithUserId.filter((n) => !n.read).length);
-              }}
-            />
-          )}
-        </div>
+        <>
+          {/* Backdrop for mobile */}
+          <div 
+            className="fixed inset-0 z-40 bg-black bg-opacity-25 md:hidden" 
+            onClick={() => setOpen(false)} 
+          />
+          
+          {/* Notification panel */}
+          <div className="absolute right-0 z-50 mt-2 bg-white border border-gray-200 shadow-2xl w-80 max-h-96 rounded-2xl">
+            {loading ? (
+              <div className="p-6 text-center text-gray-400">
+                <div className="inline-block w-4 h-4 border-2 border-gray-300 rounded-full border-t-blue-600 animate-spin"></div>
+                <p className="mt-2 text-sm">Loading notifications...</p>
+              </div>
+            ) : (
+              <NotificationList
+                notifications={notifications}
+                userId={userId}
+                onUpdate={handleNotificationUpdate}
+                onClose={() => setOpen(false)}
+              />
+            )}
+          </div>
+        </>
       )}
     </div>
   );

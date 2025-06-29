@@ -1,3 +1,4 @@
+/* @vite-ignore */
 import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
@@ -47,23 +48,28 @@ const Sidebar: React.FC<SidebarProps> = ({ isVisible, onHideSidebar }) => {
       } overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100`}
     >
       <div className="flex flex-col items-start px-4 pt-6">
-        {navItems.map((item) => (
-          <NavLink
-            key={item.path}
-            to={item.path}
-            onClick={onHideSidebar}
-            className={({ isActive }) =>
-              `flex items-center w-full gap-3 py-2 px-2 rounded-md text-sm transition ${
-                isActive
-                  ? 'bg-[#f5f5f5] text-[#5c3a21] font-semibold'
-                  : 'text-gray-700 hover:bg-gray-100'
-              }`
-            }
-          >
-            <item.icon size={20} className="shrink-0" />
-            {isVisible && <span className="truncate">{item.label}</span>}
-          </NavLink>
-        ))}
+        {navItems.map((item) => {
+          const Icon = item.icon; // Assign to a capitalized variable for React component recognition
+          return (
+            <NavLink
+              key={item.path}
+              to={item.path}
+              onClick={onHideSidebar}
+              className={({ isActive }) =>
+                `flex items-center w-full gap-3 py-2 px-2 rounded-md text-sm transition ${
+                  isActive
+                    ? 'bg-[#f5f5f5] text-[#5c3a21] font-semibold'
+                    : 'text-gray-700 hover:bg-gray-100'
+                }`
+              }
+            >
+              <div className="flex items-center gap-3">
+                {React.createElement(Icon, { size: 20, className: "shrink-0" })}
+                <span className={`truncate ${!isVisible ? 'hidden' : ''}`}>{item.label}</span>
+              </div>
+            </NavLink>
+          );
+        })}
       </div>
     </div>
   );

@@ -1,31 +1,65 @@
 // src/hooks/useSelectedPatient.ts
-import { useContext } from 'react';
-import { SelectedPatientContext } from '../contexts/SelectedPatientContext';
+import { useSelectedPatient, usePendingAction, PATIENT_ACTIONS, type PatientAction } from '../contexts/SelectedPatientContext';
 
-interface SelectedPatient {
-  id: string;
-  name: string;
-  age?: number;
-  gender?: string;
-  [key: string]: any;
-}
+// Re-export the main hook
+export default useSelectedPatient;
 
-interface UseSelectedPatientReturn {
-  patient: SelectedPatient | null;
-  setPatient: (patient: SelectedPatient | null) => void;
-}
+// Also export the utility hook and constants for convenience
+export { usePendingAction, PATIENT_ACTIONS };
+export type { PatientAction };
 
-const useSelectedPatient = (): UseSelectedPatientReturn => {
-  const context = useContext(SelectedPatientContext) as UseSelectedPatientReturn;
+// Additional utility hooks for common scenarios
 
-  if (!context) {
-    throw new Error('useSelectedPatient must be used within a SelectedPatientProvider');
-  }
+// Hook for handling connected button navigation
+export const usePatientNavigation = () => {
+  const { setPatient, setPendingAction, clearPendingAction } = useSelectedPatient();
 
-  return {
-    patient: context.patient,
-    setPatient: context.setPatient,
+  const navigateWithPatient = (patient: any, action: PatientAction, navigate: (path: string) => void) => {
+    // Convert patient to SelectedPatient format
+    const selectedPatient = {
+      id: patient.id?.toString() || '',
+      name: patient.name || patient.fullName || '',
+      age: patient.age,
+      gender: patient.gender,
+      mrn: patient.mrn,
+      contactNumber: patient.contactNumber || patient.phone,
+      diagnosis: patient.diagnosis
+    };
+
+    setPatient(selectedPatient);
+    setPendingAction(action);
+
+    // Navigate based on action
+    switch (action) {
+      case PATIENT_ACTIONS.ORDER_BLOODS:
+      case PATIENT_ACTIONS.ORDER_XRAYS:
+      case PATIENT_ACTIONS.ORDER_INVESTIGATIONS:
+        navigate('/diagnostics');
+        break;
+      case PATIENT_ACTIONS.CREATE_REFERRAL:
+        navigate('/referrals');
+        break;
+      case PATIENT_ACTIONS.GENERATE_REPORT:
+        navigate('/notes');
+        break;
+      default:
+        console.warn('Unknown action for navigation:', action);
+    }
   };
+
+  return { navigateWithPatient, clearPendingAction };
 };
 
-export default useSelectedPatient;
+// Hook for checking if we're in a connected workflow
+export const useConnectedWorkflow = () => {
+  const { patient, pendingAction } = useSelectedPatient();
+  
+  return {
+    isInWorkflow: !!(patient && pendingAction),
+    patient,
+    action: pendingAction,
+    workflowDescription: patient && pendingAction 
+      ? `${pendingAction.replace('-', ' ').toUpperCase()} for ${patient.name}`
+      : null
+  };
+};

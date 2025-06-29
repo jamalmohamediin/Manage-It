@@ -39,7 +39,7 @@ const BusinessSettings = () => {
     activeUsers: '1,247'
   });
 
-  const handleSettingChange = (setting: string, value: string) => {
+  const handleSettingChange = (setting: string, value: string | boolean) => {
     setSettings(prev => ({
       ...prev,
       [setting]: value

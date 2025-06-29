@@ -6,6 +6,7 @@ import {
   deleteBusinessDocument,
   toggleDocumentVisibility,
   uploadFileWithMetadata,
+  uploadFileForPatient,
 } from '../firebase/storage';
 import { useBusinessContext } from '../contexts/BusinessContext';
 import { useUserContext } from '../contexts/UserContext';
@@ -60,15 +61,12 @@ const Documents: React.FC = () => {
 
     try {
       if (patient) {
-        await uploadFileWithMetadata({
+        await uploadFileForPatient(
           file,
-          itemId: patient.id,
-          itemType: 'patients',
-          metadata: {
-            uploadedBy: user.name || 'Unknown',
-            uploadedById: user.id,
-          },
-        });
+          patient.id,
+          user.id,
+          user.name || 'Unknown'
+        );
         toast.success(`File uploaded for patient: ${patient.name}`);
       } else if (businessId) {
         await uploadBusinessDocument(file, businessId, user.id, user.name || 'Unknown');

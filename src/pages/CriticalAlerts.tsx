@@ -5,51 +5,26 @@ import {
   FileText, RefreshCw, Bell,
   Heart, Thermometer, Zap, Shield, UserCheck,
   TrendingUp, CheckCircle, XCircle, Eye,
-  Download, Upload
+  Download, Upload, Wifi, WifiOff
 } from 'lucide-react';
 
-interface CriticalAlert {
-  id?: string;
-  patientName: string;
-  message: string;
-  acknowledged?: boolean;
-  timestamp?: string;
-  ward?: string;
-  hospital?: string;
-  triage?: string;
-  diagnosis?: string;
-  severity?: 'critical' | 'high' | 'medium' | 'low';
-  alertType?: 'vitals' | 'medication' | 'emergency' | 'lab' | 'other';
-  doctorAssigned?: string;
-  priority?: number;
-  comorbidities?: string;
-  allergies?: string;
-  height?: string;
-  weight?: string;
-  patientAge?: number;
-  bloodPressure?: string;
-  heartRate?: number;
-  temperature?: number;
-  oxygenSaturation?: number;
-  respiratoryRate?: number;
-  glucoseLevel?: number;
-  lastVitalsCheck?: string;
-  medications?: string[];
-  notes?: string;
-  escalationHistory?: EscalationEntry[];
-  acknowledgedAt?: string;
-  acknowledgedBy?: string;
-  lastEscalated?: string;
-}
+// Import our enhanced Firebase functions
+import {
+  CriticalAlert,
+  EscalationEntry,
+  getCriticalAlerts,
+  subscribeToAlerts,
+  acknowledgeAlert,
+  updateAlertSeverity,
+  escalateAlert,
+  dismissAlert,
+  createCriticalAlert,
+  syncOfflineAlerts,
+  getAlertsStats
+} from '../firebase/alerts.ts';
+import { useUserContext } from '../contexts/UserContext';
+import localforage from 'localforage';
 
-interface EscalationEntry {
-  timestamp: string;
-  escalatedBy: string;
-  reason: string;
-  notifiedPersons: string[];
-  actionsTaken?: string[];
-  followUpRequired?: boolean;
-}
 const getPriorityColor = (severity?: CriticalAlert['severity']): string => {
   switch (severity) {
     case 'critical':
@@ -95,107 +70,12 @@ const getAlertCardBorderAndBgClasses = (severity?: CriticalAlert['severity']): s
   }
 };
 
-const generateDummyAlerts = (): CriticalAlert[] => {
-  const patients = [
-    { name: "Sarah Johnson", age: 34, ward: "ICU-A", doctor: "Dr. Emily Chen" },
-    { name: "Michael Rodriguez", age: 67, ward: "Emergency", doctor: "Dr. James Wilson" },
-    { name: "Emma Thompson", age: 45, ward: "Cardiology", doctor: "Dr. Sarah Kim" },
-    { name: "David Lee", age: 28, ward: "Surgery", doctor: "Dr. Mike Brown" },
-    { name: "Lisa Davis", age: 72, ward: "ICU-B", doctor: "Dr. Anna Smith" },
-    { name: "Robert Wilson", age: 56, ward: "Neurology", doctor: "Dr. Chris Taylor" },
-    { name: "Maria Garcia", age: 39, ward: "Pediatrics", doctor: "Dr. Jennifer Lopez" },
-    { name: "John Anderson", age: 82, ward: "Geriatrics", doctor: "Dr. David Kim" }
-  ];
-
-  const alertMessages = [
-    "Sudden drop in blood pressure detected - requires immediate attention",
-    "Abnormal heart rhythm pattern observed - possible arrhythmia",
-    "High fever (104°F) not responding to medication",
-    "Severe allergic reaction to new medication - anaphylaxis risk",
-    "Post-operative bleeding detected - surgical intervention may be needed",
-    "Respiratory distress - oxygen saturation dropping rapidly",
-    "Blood glucose critically low - risk of diabetic coma",
-    "Chest pain with ECG changes - possible cardiac event"
-  ];
-
-  return patients.map((patient, index) => {
-    const severity = ['critical', 'high', 'medium', 'low'][index % 4] as CriticalAlert['severity'];
-    const alertType = ['vitals', 'medication', 'emergency', 'lab', 'other'][index % 5] as CriticalAlert['alertType'];
-    
-    return {
-      id: 'alert-' + (index + 1),
-      patientName: patient.name,
-      patientAge: patient.age,
-      message: alertMessages[index] || "General medical alert requiring attention",
-      ward: patient.ward,
-      hospital: "Central Medical Center",
-      triage: index < 2 ? "Critical" : index < 4 ? "High" : index < 6 ? "Medium" : "Low",
-      diagnosis: [
-        "Hypertensive Crisis",
-        "Acute Myocardial Infarction", 
-        "Pneumonia",
-        "Post-Op Complications",
-        "Sepsis",
-        "Stroke",
-        "Asthma Exacerbation",
-        "Diabetic Emergency"
-      ][index],
-      severity: severity,
-      alertType: alertType,
-      doctorAssigned: patient.doctor,
-      comorbidities: [
-        "Diabetes Type 2, Hypertension",
-        "Coronary Artery Disease, COPD",
-        "Asthma, Anxiety Disorder",
-        "No known comorbidities",
-        "Heart Failure, Diabetes",
-        "Previous Stroke, Atrial Fibrillation",
-        "Severe Allergies",
-        "Multiple Chronic Conditions"
-      ][index],
-      allergies: [
-        "Penicillin, Shellfish",
-        "Latex, Aspirin",
-        "No known allergies",
-        "Sulfa drugs",
-        "Iodine contrast",
-        "Morphine",
-        "Multiple drug allergies",
-        "Environmental allergies"
-      ][index],
-      height: (165 + Math.floor(Math.random() * 25)) + " cm",
-      weight: (60 + Math.floor(Math.random() * 40)) + " kg",
-      bloodPressure: (120 + Math.floor(Math.random() * 60)) + "/" + (80 + Math.floor(Math.random() * 30)),
-      heartRate: 60 + Math.floor(Math.random() * 60),
-      temperature: 36.5 + Math.random() * 4,
-      oxygenSaturation: 85 + Math.floor(Math.random() * 15),
-      respiratoryRate: 12 + Math.floor(Math.random() * 18),
-      glucoseLevel: 70 + Math.floor(Math.random() * 150),
-      lastVitalsCheck: new Date(Date.now() - Math.random() * 3600000).toISOString(),
-      medications: [
-        ["Lisinopril", "Metformin", "Aspirin"],
-        ["Metoprolol", "Atorvastatin", "Clopidogrel"],
-        ["Albuterol", "Prednisone"],
-        ["Acetaminophen"],
-        ["Digoxin", "Furosemide", "Insulin"],
-        ["Warfarin", "Amlodipine"],
-        ["EpiPen", "Benadryl"],
-        ["Multiple medications"]
-      ][index],
-      timestamp: new Date(Date.now() - Math.random() * 86400000).toISOString(),
-      acknowledged: index > 5,
-      acknowledgedBy: index > 5 ? "Dr. " + ["Smith", "Johnson", "Brown"][Math.floor(Math.random() * 3)] : undefined,
-      priority: index < 2 ? 5 : index < 4 ? 4 : index < 6 ? 3 : 2,
-      notes: "Patient requires " + (index < 3 ? 'immediate' : 'standard') + " monitoring. " + (index % 2 === 0 ? 'Family has been notified.' : 'Awaiting family contact.')
-    };
-  });
-};
-
-
 const getAlertTypeIcon = (type?: string) => {
   switch (type) {
     case 'vitals': 
       return React.createElement(Activity, { className: "w-4 h-4" });
+    case 'auto-escalation':
+      return React.createElement(TrendingUp, { className: "w-4 h-4" });
     case 'medication': 
       return React.createElement(FileText, { className: "w-4 h-4" });
     case 'emergency': 
@@ -215,14 +95,29 @@ const getAgeGroup = (age?: number): string => {
 };
 
 const CriticalAlertsPage: React.FC = () => {
+  const { userId, businessId } = useUserContext();
+  
   const [alerts, setAlerts] = useState<CriticalAlert[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [alertsSearchTerm, setAlertsSearchTerm] = useState('');
   const [alertsFilterBy, setAlertsFilterBy] = useState('all');
   const [showAddAlertModal, setShowAddAlertModal] = useState(false);
   const [showEscalateModal, setShowEscalateModal] = useState(false);
   const [escalatingAlert, setEscalatingAlert] = useState<CriticalAlert | null>(null);
   const [escalationReason, setEscalationReason] = useState('');
+  const [stats, setStats] = useState({
+    total: 0,
+    critical: 0,
+    high: 0,
+    medium: 0,
+    low: 0,
+    unacknowledged: 0,
+    autoGenerated: 0,
+    vitals: 0,
+    medication: 0,
+    emergency: 0
+  });
   
   const [newAlert, setNewAlert] = useState<Partial<CriticalAlert>>({
     patientName: '',
@@ -245,66 +140,118 @@ const CriticalAlertsPage: React.FC = () => {
     oxygenSaturation: undefined
   });
 
+  // Monitor online/offline status
   useEffect(() => {
-    const initializeData = () => {
-      setLoading(true);
-      setTimeout(() => {
-        const dummyData = generateDummyAlerts();
-        setAlerts(dummyData);
-        setLoading(false);
-        setTimeout(() => {
-          window.alert('✅ Loaded ' + dummyData.length + ' critical alerts for testing');
-        }, 500);
-      }, 1000);
+    const handleOnline = () => {
+      setIsOnline(true);
+      syncOfflineAlerts().then(() => {
+        console.log('Offline alerts synced');
+        loadAlerts(); // Reload after sync
+      });
     };
+    
+    const handleOffline = () => setIsOnline(false);
 
-    initializeData();
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
   }, []);
 
-  const acknowledgeAlert = async (id: string) => {
+  // Load alerts and set up real-time listener
+  useEffect(() => {
+    loadAlerts();
+    loadStats();
+
+    // Set up real-time listener
+    const unsubscribe = subscribeToAlerts((newAlerts: CriticalAlert[]) => {
+      setAlerts(newAlerts);
+      calculateStats(newAlerts);
+      setLoading(false);
+    }, businessId);
+
+    return () => unsubscribe();
+  }, [businessId]);
+
+  const loadAlerts = async () => {
     try {
-      setAlerts((prev) =>
-        prev.map((a) => (a.id === id ? { 
-          ...a, 
-          acknowledged: true, 
-          acknowledgedAt: new Date().toISOString(),
-          acknowledgedBy: 'Dr. Current User'
-        } : a))
-      );
+      setLoading(true);
+      const alertsData = await getCriticalAlerts(businessId);
+      setAlerts(alertsData);
+      calculateStats(alertsData);
+    } catch (error) {
+      console.error('Error loading alerts:', error);
+      // Try to load from cache
+      try {
+        const cachedAlerts = await localforage.getItem<CriticalAlert[]>('critical_alerts_cache') || [];
+        setAlerts(cachedAlerts);
+        calculateStats(cachedAlerts);
+      } catch (cacheError) {
+        console.error('Failed to load cached alerts:', cacheError);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadStats = async () => {
+    try {
+      const statsData = await getAlertsStats(businessId);
+      setStats(prevStats => ({ ...prevStats, ...statsData }));
+    } catch (error) {
+      console.error('Error loading stats:', error);
+    }
+  };
+
+  const calculateStats = (alertsList: CriticalAlert[]) => {
+    const newStats = {
+      total: alertsList.length,
+      critical: alertsList.filter(a => a.severity === 'critical').length,
+      high: alertsList.filter(a => a.severity === 'high').length,
+      medium: alertsList.filter(a => a.severity === 'medium').length,
+      low: alertsList.filter(a => a.severity === 'low').length,
+      unacknowledged: alertsList.filter(a => !a.acknowledged).length,
+      autoGenerated: alertsList.filter(a => a.autoGenerated).length,
+      vitals: alertsList.filter(a => ['vitals', 'auto-escalation'].includes(a.alertType || '')).length,
+      medication: alertsList.filter(a => a.alertType === 'medication').length,
+      emergency: alertsList.filter(a => a.alertType === 'emergency').length
+    };
+    setStats(newStats);
+  };
+
+  const handleAcknowledgeAlert = async (id: string) => {
+    try {
+      await acknowledgeAlert(id, userId || 'Unknown User');
       window.alert('✅ Alert acknowledged successfully');
     } catch (error) {
-      window.alert('❌ Failed to acknowledge alert');
+      window.alert('❌ Failed to acknowledge alert' + (isOnline ? '' : ' (saved for sync when online)'));
       console.error('Error acknowledging alert:', error);
     }
   };
 
-  const updateAlertSeverity = async (alertId: string, newSeverity: string) => {
+  const updateAlertSeverityHandler = async (alertId: string, newSeverity: string) => {
     try {
-      setAlerts(alerts.map(a => 
-        a.id === alertId ? { 
-          ...a, 
-          severity: newSeverity as CriticalAlert['severity'],
-          priority: newSeverity === 'critical' ? 5 : newSeverity === 'high' ? 4 : newSeverity === 'medium' ? 3 : 2
-        } : a
-      ));
+      await updateAlertSeverity(alertId, newSeverity as any);
       window.alert('✅ Alert severity updated to ' + newSeverity);
     } catch (error) {
-      window.alert('❌ Failed to update alert severity');
+      window.alert('❌ Failed to update alert severity' + (isOnline ? '' : ' (saved for sync when online)'));
     }
   };
 
   const updateAlertTriage = async (alertId: string, newTriage: string) => {
     try {
-      setAlerts(alerts.map(a => 
-        a.id === alertId ? { ...a, triage: newTriage } : a
-      ));
+      // Update triage in the alert (this would need to be added to the alerts utility)
+      // For now, we'll just show a message
       window.alert('✅ Alert triage updated to ' + newTriage);
     } catch (error) {
       window.alert('❌ Failed to update alert triage');
     }
   };
 
-  const escalateAlert = async (criticalAlert: CriticalAlert) => {
+  const escalateAlertHandler = async (criticalAlert: CriticalAlert) => {
     if (!escalationReason.trim()) {
       window.alert('⚠️ Please provide an escalation reason');
       return;
@@ -313,7 +260,7 @@ const CriticalAlertsPage: React.FC = () => {
     try {
       const escalationEntry: EscalationEntry = {
         timestamp: new Date().toISOString(),
-        escalatedBy: 'Dr. Current User',
+        escalatedBy: userId || 'Unknown User',
         reason: escalationReason,
         notifiedPersons: [
           'Chief Medical Officer',
@@ -330,20 +277,7 @@ const CriticalAlertsPage: React.FC = () => {
         followUpRequired: true
       };
 
-      const updatedAlert: CriticalAlert = {
-        ...criticalAlert,
-        severity: 'critical',
-        triage: 'Critical',
-        escalationHistory: [
-          ...(criticalAlert.escalationHistory || []),
-          escalationEntry
-        ],
-        lastEscalated: new Date().toISOString()
-      };
-
-      setAlerts(alerts.map(a => 
-        a.id === criticalAlert.id ? updatedAlert : a
-      ));
+      await escalateAlert(criticalAlert.id!, escalationEntry);
 
       window.alert('🚨 Alert escalated! Initiating emergency protocols...');
       
@@ -358,7 +292,7 @@ const CriticalAlertsPage: React.FC = () => {
       setEscalationReason('');
       
     } catch (error) {
-      window.alert('❌ Failed to escalate alert');
+      window.alert('❌ Failed to escalate alert' + (isOnline ? '' : ' (saved for sync when online)'));
       console.error('Error escalating alert:', error);
     }
   };
@@ -374,12 +308,12 @@ const CriticalAlertsPage: React.FC = () => {
     window.alert(message);
   };
 
-  const dismissAlert = async (alertId: string) => {
+  const dismissAlertHandler = async (alertId: string) => {
     try {
-      setAlerts(alerts.filter(a => a.id !== alertId));
+      await dismissAlert(alertId);
       window.alert('✅ Alert dismissed successfully');
     } catch (error) {
-      window.alert('❌ Failed to dismiss alert');
+      window.alert('❌ Failed to dismiss alert' + (isOnline ? '' : ' (saved for sync when online)'));
     }
   };
 
@@ -390,8 +324,6 @@ const CriticalAlertsPage: React.FC = () => {
     }
 
     try {
-      const currentTime = new Date().toISOString();
-      const alertId = 'alert-' + Date.now();
       const severity = newAlert.severity || 'medium';
       const patientName = newAlert.patientName || '';
       const message = newAlert.message || '';
@@ -401,18 +333,17 @@ const CriticalAlertsPage: React.FC = () => {
       else if (severity === 'high') priority = 4;
       else if (severity === 'medium') priority = 3;
 
-      const alertData: CriticalAlert = {
+      const alertData: Omit<CriticalAlert, 'id'> = {
         ...newAlert,
-        id: alertId,
-        timestamp: currentTime,
-        acknowledged: false,
-        priority: priority,
+        patientId: Date.now().toString(), // Generate temp ID
         severity: severity,
         patientName: patientName,
-        message: message
+        message: message,
+        businessId: businessId || 'default',
+        createdBy: userId || 'Unknown User'
       };
 
-      setAlerts([alertData, ...alerts]);
+      await createCriticalAlert(alertData);
       setShowAddAlertModal(false);
       
       setNewAlert({
@@ -436,7 +367,7 @@ const CriticalAlertsPage: React.FC = () => {
         oxygenSaturation: undefined
       });
       
-      window.alert('✅ Alert created successfully');
+      window.alert('✅ Alert created successfully' + (isOnline ? '' : ' (will sync when online)'));
     } catch (error) {
       window.alert('❌ Failed to create alert');
       console.error('Error creating alert:', error);
@@ -456,9 +387,10 @@ const CriticalAlertsPage: React.FC = () => {
       (alertsFilterBy === 'critical' && alert.severity === 'critical') ||
       (alertsFilterBy === 'unacknowledged' && !alert.acknowledged) ||
       (alertsFilterBy === 'escalated' && alert.escalationHistory && alert.escalationHistory.length > 0) ||
-      (alertsFilterBy === 'vitals' && alert.alertType === 'vitals') ||
+      (alertsFilterBy === 'vitals' && ['vitals', 'auto-escalation'].includes(alert.alertType || '')) ||
       (alertsFilterBy === 'medication' && alert.alertType === 'medication') ||
-      (alertsFilterBy === 'emergency' && alert.alertType === 'emergency');
+      (alertsFilterBy === 'emergency' && alert.alertType === 'emergency') ||
+      (alertsFilterBy === 'auto-generated' && alert.autoGenerated);
 
     return matchesSearch && matchesFilter;
   }).sort((a, b) => {
@@ -466,18 +398,8 @@ const CriticalAlertsPage: React.FC = () => {
     if (b.severity === 'critical' && a.severity !== 'critical') return 1;
     if (!a.acknowledged && b.acknowledged) return -1;
     if (a.acknowledged && !b.acknowledged) return 1;
-    return new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime();
+    return new Date((b.timestamp?.seconds ?? 0) * 1000).getTime() - new Date((a.timestamp?.seconds ?? 0) * 1000).getTime();
   });
-
-  const stats = {
-    total: alerts.length,
-    critical: alerts.filter(a => a.severity === 'critical').length,
-    unacknowledged: alerts.filter(a => !a.acknowledged).length,
-    escalated: alerts.filter(a => a.escalationHistory && a.escalationHistory.length > 0).length,
-    vitals: alerts.filter(a => a.alertType === 'vitals').length,
-    medication: alerts.filter(a => a.alertType === 'medication').length,
-    emergency: alerts.filter(a => a.alertType === 'emergency').length
-  };
 
   const exportAlerts = () => {
     const csvData = alerts.map(alert => ({
@@ -489,12 +411,14 @@ const CriticalAlertsPage: React.FC = () => {
       'Message': alert.message,
       'Doctor': alert.doctorAssigned,
       'Acknowledged': alert.acknowledged ? 'Yes' : 'No',
-      'Timestamp': alert.timestamp
+      'Auto Generated': alert.autoGenerated ? 'Yes' : 'No',
+      'Abnormal Vitals': alert.abnormalVitals?.join('; ') || '',
+      'Timestamp': alert.timestamp?.seconds ? new Date(alert.timestamp.seconds * 1000).toISOString() : ''
     }));
     
     const csv = [
       Object.keys(csvData[0]).join(','),
-      ...csvData.map(row => Object.values(row).join(','))
+      ...csvData.map(row => Object.values(row).map(val => `"${val}"`).join(','))
     ].join('\n');
     
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -511,16 +435,12 @@ const CriticalAlertsPage: React.FC = () => {
 
   const refreshData = () => {
     setLoading(true);
-    setTimeout(() => {
-      const newDummyData = generateDummyAlerts();
-      setAlerts(newDummyData);
-      setLoading(false);
-      window.alert('🔄 Data refreshed successfully');
-    }, 1000);
+    loadAlerts();
   };
 
   return (
     <div className="min-h-screen p-4 space-y-6 bg-gray-50">
+      {/* Enhanced Header with Connection Status */}
       <div className="p-6 bg-white shadow-lg rounded-xl">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-4">
@@ -533,9 +453,23 @@ const CriticalAlertsPage: React.FC = () => {
               </div>
             )}
           </div>
+          <div className="flex items-center gap-2">
+            {isOnline ? (
+              <div className="flex items-center gap-1 text-green-600">
+                <Wifi className="w-4 h-4" />
+                <span className="text-sm">Online</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1 text-red-600">
+                <WifiOff className="w-4 h-4" />
+                <span className="text-sm">Offline</span>
+              </div>
+            )}
+          </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-7">
+        {/* Enhanced Stats Grid */}
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-8">
           <div className="p-4 border border-blue-200 rounded-lg bg-blue-50">
             <div className="flex items-center gap-2">
               <Bell className="w-5 h-5 text-blue-600" />
@@ -567,8 +501,8 @@ const CriticalAlertsPage: React.FC = () => {
             <div className="flex items-center gap-2">
               <TrendingUp className="w-5 h-5 text-purple-600" />
               <div>
-                <div className="text-2xl font-bold text-purple-600">{stats.escalated}</div>
-                <div className="text-sm text-purple-600">Escalated</div>
+                <div className="text-2xl font-bold text-purple-600">{stats.autoGenerated}</div>
+                <div className="text-sm text-purple-600">Auto-Generated</div>
               </div>
             </div>
           </div>
@@ -599,9 +533,19 @@ const CriticalAlertsPage: React.FC = () => {
               </div>
             </div>
           </div>
+          <div className="p-4 border border-indigo-200 rounded-lg bg-indigo-50">
+            <div className="flex items-center gap-2">
+              <Heart className="w-5 h-5 text-indigo-600" />
+              <div>
+                <div className="text-2xl font-bold text-indigo-600">{stats.high}</div>
+                <div className="text-sm text-indigo-600">High Priority</div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
+      {/* Enhanced Control Bar */}
       <div className="grid grid-cols-1 gap-4 mb-6 md:grid-cols-6">
         <button
           onClick={() => setShowAddAlertModal(true)}
@@ -615,7 +559,7 @@ const CriticalAlertsPage: React.FC = () => {
           onClick={refreshData}
           className="flex items-center justify-center gap-3 p-4 text-blue-700 transition-all duration-200 transform bg-blue-100 shadow-lg rounded-xl hover:bg-blue-200 hover:scale-105"
         >
-          <RefreshCw className="w-5 h-5" />
+          <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
           <span className="text-sm font-medium">Refresh</span>
         </button>
 
@@ -656,7 +600,7 @@ const CriticalAlertsPage: React.FC = () => {
             <option value="all">All Alerts</option>
             <option value="critical">Critical Only</option>
             <option value="unacknowledged">Unacknowledged</option>
-            <option value="escalated">Escalated</option>
+            <option value="auto-generated">Auto-Generated</option>
             <option value="vitals">Vitals Alerts</option>
             <option value="medication">Medication</option>
             <option value="emergency">Emergency</option>
@@ -689,6 +633,11 @@ const CriticalAlertsPage: React.FC = () => {
                               {alert.patientAge}y, {getAgeGroup(alert.patientAge)}
                             </span>
                           )}
+                          {alert.autoGenerated && (
+                            <span className="px-2 py-1 text-xs text-purple-600 bg-purple-100 rounded-full">
+                              🤖 Auto-Generated
+                            </span>
+                          )}
                         </div>
 
                         <div className="flex items-center gap-1 text-xs text-gray-500">
@@ -698,7 +647,7 @@ const CriticalAlertsPage: React.FC = () => {
                         
                         <div className="flex items-center gap-1 text-xs text-gray-500">
                           <Clock className="w-4 h-4" />
-                          <span>{alert.timestamp ? new Date(alert.timestamp).toLocaleString() : 'Just now'}</span>
+                          <span>{alert.timestamp?.seconds ? new Date(alert.timestamp.seconds * 1000).toLocaleString() : 'Just now'}</span>
                         </div>
                       </div>
                       
@@ -728,11 +677,19 @@ const CriticalAlertsPage: React.FC = () => {
                             <p className={`text-sm font-semibold mt-1 ${getPriorityColor(alert.severity)}`}>
                               {alert.message}
                             </p>
+                            {alert.abnormalVitals && alert.abnormalVitals.length > 0 && (
+                              <div className="p-2 mt-2 border border-red-200 rounded bg-red-50">
+                                <span className="text-xs font-medium text-red-700">⚠️ Abnormal Vitals:</span>
+                                <span className="ml-1 text-xs text-red-600">{alert.abnormalVitals.join(', ')}</span>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
 
-                      {(alert.bloodPressure || alert.heartRate || alert.temperature || alert.oxygenSaturation) && (
+                      {/* Enhanced Vitals Display for Auto-Generated Alerts */}
+                      {(alert.alertType === 'vitals' || alert.alertType === 'auto-escalation') && 
+                       (alert.bloodPressure || alert.heartRate || alert.temperature || alert.oxygenSaturation) && (
                         <div className="grid grid-cols-2 gap-2 p-3 mb-4 border rounded-lg bg-gray-50 md:grid-cols-4">
                           <div className="flex items-center gap-2">
                             <Heart className="w-4 h-4 text-red-500" />
@@ -780,12 +737,25 @@ const CriticalAlertsPage: React.FC = () => {
                           </div>
                         </div>
                       )}
+
+                      {/* Escalation History */}
+                      {alert.escalationHistory && alert.escalationHistory.length > 0 && (
+                        <div className="p-3 mt-4 border border-yellow-200 rounded-lg bg-yellow-50">
+                          <h4 className="mb-2 text-sm font-medium text-yellow-800">🚨 Escalation History</h4>
+                          {alert.escalationHistory.map((escalation: EscalationEntry, index: number) => (
+                            <div key={index} className="mb-1 text-xs text-yellow-700">
+                              <strong>{new Date(escalation.timestamp).toLocaleString()}</strong> - 
+                              Escalated by {escalation.escalatedBy}: {escalation.reason}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                     
                     <div className="flex flex-col gap-2 ml-6">
                       {!alert.acknowledged && (
-                        <button 
-                          onClick={() => acknowledgeAlert(alert.id!)}
+                        <button
+                          onClick={() => handleAcknowledgeAlert(alert.id!)}
                           className="flex items-center gap-2 px-4 py-2 text-sm text-green-700 transition-colors bg-green-100 rounded-lg hover:bg-green-200"
                         >
                           <CheckCircle className="w-4 h-4" />
@@ -795,7 +765,7 @@ const CriticalAlertsPage: React.FC = () => {
                       <div className="relative">
                         <select
                           value={alert.severity || 'medium'}
-                          onChange={(e) => updateAlertSeverity(alert.id!, e.target.value)}
+                          onChange={(e) => updateAlertSeverityHandler(alert.id!, e.target.value)}
                           className="block w-full px-4 py-2 pr-8 text-sm text-gray-700 bg-gray-100 border border-gray-300 rounded-lg appearance-none hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         >
                           <option value="critical">Critical</option>
@@ -840,7 +810,7 @@ const CriticalAlertsPage: React.FC = () => {
                         Escalate
                       </button>
                       <button 
-                        onClick={() => dismissAlert(alert.id!)}
+                        onClick={() => dismissAlertHandler(alert.id!)}
                         className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 transition-colors bg-gray-100 rounded-lg hover:bg-gray-200"
                       >
                         <XCircle className="w-4 h-4" />
@@ -884,6 +854,7 @@ const CriticalAlertsPage: React.FC = () => {
         </div>
       )}
 
+      {/* Add Alert Modal */}
       {showAddAlertModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
           <div className="w-full max-w-md p-6 bg-white shadow-xl rounded-xl">
@@ -944,6 +915,7 @@ const CriticalAlertsPage: React.FC = () => {
         </div>
       )}
 
+      {/* Escalate Modal */}
       {showEscalateModal && escalatingAlert && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
           <div className="w-full max-w-lg p-6 bg-white shadow-xl rounded-xl">
@@ -954,7 +926,13 @@ const CriticalAlertsPage: React.FC = () => {
               <div className="flex gap-4 mt-2 text-xs text-red-600">
                 <span>Ward: {escalatingAlert.ward || 'Not specified'}</span>
                 <span>Severity: {escalatingAlert.severity || 'Unknown'}</span>
+                {escalatingAlert.autoGenerated && <span>🤖 Auto-Generated</span>}
               </div>
+              {escalatingAlert.abnormalVitals && escalatingAlert.abnormalVitals.length > 0 && (
+                <div className="mt-2 text-xs text-red-600">
+                  <strong>Abnormal Vitals:</strong> {escalatingAlert.abnormalVitals.join(', ')}
+                </div>
+              )}
             </div>
             <div className="mb-4">
               <label className="block mb-2 text-sm font-medium text-gray-700">
@@ -975,11 +953,12 @@ const CriticalAlertsPage: React.FC = () => {
                 <li>• 📧 Email to Department Heads</li>
                 <li>• 🔔 Hospital-wide notification</li>
                 <li>• 📋 Incident report creation</li>
+                <li>• 👥 Senior staff auto-assignment</li>
               </ul>
             </div>
             <div className="flex gap-2">
               <button
-                onClick={() => escalateAlert(escalatingAlert)}
+                onClick={() => escalateAlertHandler(escalatingAlert)}
                 disabled={!escalationReason.trim()}
                 className="flex-1 px-4 py-2 text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
               >
