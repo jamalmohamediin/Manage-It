@@ -40,8 +40,10 @@ import { UserProvider } from './contexts/UserContext';
 import { RoleProvider } from './contexts/RoleContext';
 import { LanguageProvider } from './contexts/LanguageContext';
 import { DashboardProvider } from './contexts/DashboardContext';
-// NEW: Import the SelectedPatientProvider for connected button functionality
 import { SelectedPatientProvider } from './contexts/SelectedPatientContext';
+
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 const App: React.FC = () => {
   const [isSidebarVisible, setSidebarVisible] = useState(true);
@@ -53,7 +55,6 @@ const App: React.FC = () => {
         <BusinessProvider>
           <RoleProvider>
             <LanguageProvider>
-              {/* NEW: Wrap with SelectedPatientProvider for cross-page patient communication */}
               <SelectedPatientProvider>
                 <Router>
                   <div className="relative flex min-h-screen bg-gray-50">
@@ -102,6 +103,7 @@ const App: React.FC = () => {
                       </div>
                     </div>
                   </div>
+                  <ToastContainer position="top-right" autoClose={3000} />
                 </Router>
               </SelectedPatientProvider>
             </LanguageProvider>
